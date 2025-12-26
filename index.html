@@ -156,7 +156,7 @@
 <body>
 
 <div id="container">
-    <div id="version-tag">Ver 9.0 (BGM Mix)</div>
+    <div id="version-tag">Ver 9.1 (Safe Mode)</div>
 
     <video id="timeline1" src="timeline1.mp4?v=9" playsinline webkit-playsinline loop muted preload="auto"></video>
     
@@ -190,7 +190,7 @@
     const signature = document.getElementById('signature');
     const signaturePath = signature.querySelector('path');
     const narration = document.getElementById('narration');
-    const bgm = document.getElementById('bgm'); // 新增背景音樂變數
+    const bgm = document.getElementById('bgm');
     const blowHint = document.getElementById('blow-hint');
     
     let audioContext, analyser, microphone;
@@ -223,53 +223,64 @@
     timeline1.addEventListener('error', (e) => handleError(e, 't1'));
     timeline2.addEventListener('error', (e) => handleError(e, 't2'));
     narration.addEventListener('error', (e) => handleError(e, 'narration'));
-    bgm.addEventListener('error', (e) => handleError(e, 'bgm'));
+    if(bgm) bgm.addEventListener('error', (e) => handleError(e, 'bgm'));
 
     // --- 1. 使用者點擊按鈕 ---
     wishBtn.addEventListener('click', async () => {
-        startScreen.style.opacity = '0';
-        setTimeout(() => startScreen.style.display = 'none', 1000);
-
-        // 預先解鎖影片
-        timeline2.play().then(() => {
-            timeline2.pause();
-            timeline2.currentTime = 0;
-        }).catch(e => console.log("Video unlock failed:", e));
-
-        // 預先解鎖口白
-        narration.play().then(() => {
-            narration.pause();
-            narration.currentTime = 0;
-        }).catch(e => console.log("Narration unlock failed:", e));
-
-        // 預先解鎖背景音樂 (關鍵)
-        bgm.play().then(() => {
-            bgm.pause();
-            bgm.currentTime = 0;
-        }).catch(e => console.log("BGM unlock failed:", e));
-
-        // 播放 Timeline 1
-        timeline1.classList.add('visible');
         try {
-            await timeline1.play();
-        } catch (e) {
-            timeline1.muted = true;
-            timeline1.play();
-        }
+            // 介面轉換
+            startScreen.style.opacity = '0';
+            setTimeout(() => startScreen.style.display = 'none', 1000);
 
-        blowHint.innerHTML = "偵測麥克風中...請對著手機底部吹氣<br><span style='font-size:0.8em'>(若無法吹熄，請直接點擊畫面)</span>";
-        blowHint.style.opacity = '1';
+            // A. 預先解鎖影片
+            timeline2.play().then(() => {
+                timeline2.pause();
+                timeline2.currentTime = 0;
+            }).catch(e => console.log("Video unlock failed:", e));
 
-        setTimeout(() => {
-            document.addEventListener('click', manualBlowOut);
-            document.addEventListener('touchstart', manualBlowOut);
-        }, 1000);
+            // B. 預先解鎖口白
+            narration.play().then(() => {
+                narration.pause();
+                narration.currentTime = 0;
+            }).catch(e => console.log("Narration unlock failed:", e));
 
-        try {
-            await initMicrophone();
-            detectBlow();
-        } catch (err) {
-            blowHint.innerHTML = "麥克風無法啟用<br>請直接點擊螢幕吹熄蠟燭";
+            // C. 預先解鎖背景音樂 (加入安全檢查)
+            if (bgm) {
+                bgm.play().then(() => {
+                    bgm.pause();
+                    bgm.currentTime = 0;
+                }).catch(e => console.log("BGM unlock failed (file missing?):", e));
+            }
+
+            // D. 播放 Timeline 1 (蠟燭)
+            timeline1.classList.add('visible');
+            try {
+                await timeline1.play();
+            } catch (e) {
+                console.log("Timeline1 autoplay restricted, using muted");
+                timeline1.muted = true;
+                timeline1.play();
+            }
+
+            // E. 顯示提示
+            blowHint.innerHTML = "偵測麥克風中...請對著手機底部吹氣<br><span style='font-size:0.8em'>(若無法吹熄，請直接點擊畫面)</span>";
+            blowHint.style.opacity = '1';
+
+            // F. 備用方案
+            setTimeout(() => {
+                document.addEventListener('click', manualBlowOut);
+                document.addEventListener('touchstart', manualBlowOut);
+            }, 1000);
+
+            // G. 啟動麥克風
+            try {
+                await initMicrophone();
+                detectBlow();
+            } catch (err) {
+                blowHint.innerHTML = "麥克風無法啟用<br>請直接點擊螢幕吹熄蠟燭";
+            }
+        } catch (fatalError) {
+            alert("發生錯誤，請重新整理網頁。\n" + fatalError.message);
         }
     });
 
@@ -279,122 +290,4 @@
         }
     }
 
-    async function initMicrophone() {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        microphone = audioContext.createMediaStreamSource(stream);
-        microphone.connect(analyser);
-        analyser.fftSize = 256;
-    }
-
-    function detectBlow() {
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        
-        function checkAudio() {
-            if (isBlowing) return;
-            analyser.getByteFrequencyData(dataArray);
-            
-            let sum = 0;
-            for(let i = 0; i < bufferLength; i++) sum += dataArray[i];
-            let average = sum / bufferLength;
-
-            if (average > 45) { 
-                triggerBlowOut();
-            } else {
-                requestAnimationFrame(checkAudio);
-            }
-        }
-        checkAudio();
-    }
-
-    // --- 切換邏輯 ---
-    function triggerBlowOut() {
-        if(isBlowing) return;
-        isBlowing = true;
-        
-        document.removeEventListener('click', manualBlowOut);
-        document.removeEventListener('touchstart', manualBlowOut);
-        blowHint.style.opacity = '0';
-
-        timeline2.style.zIndex = "100"; 
-        
-        timeline2.play().then(() => {
-            timeline2.classList.add('visible');
-            setTimeout(() => {
-                timeline1.classList.remove('visible');
-                timeline1.pause();
-            }, 100);
-        }).catch(error => {
-            alert("播放失敗: " + error.message);
-        });
-
-        timeline2.onended = () => {
-            showCard();
-        };
-    }
-
-    // --- 顯示賀卡 (含混音邏輯) ---
-    function showCard() {
-        timeline2.style.opacity = '0';
-        cardScreen.style.opacity = '1';
-        
-        // 1. 設定音量
-        narration.volume = 1.0; // 口白最大聲
-        bgm.volume = 0.3;       // 背景音樂 30% 音量 (不搶戲)
-        
-        // 2. 同時播放
-        bgm.play().catch(e => console.log("BGM play error:", e));
-        narration.play().catch(e => console.log("Narration play error:", e));
-        
-        // 3. 監聽口白結束事件，將背景音樂轉大聲
-        narration.onended = () => {
-            // 使用漸強效果 (Fade In)
-            let vol = 0.3;
-            const fadeInterval = setInterval(() => {
-                if (vol < 1.0) {
-                    vol += 0.05; // 每次加 5%
-                    bgm.volume = Math.min(vol, 1.0);
-                } else {
-                    clearInterval(fadeInterval);
-                }
-            }, 200); // 每 0.2 秒調整一次
-        };
-        
-        // 4. 開始打字
-        playSequence(0);
-    }
-
-    // 處理每一段的播放
-    function playSequence(index) {
-        if (index >= greetingSequence.length) {
-            showSignature();
-            return;
-        }
-
-        const segment = greetingSequence[index];
-        typeWriterSegment(segment.text, 0, segment.speed, () => {
-            setTimeout(() => {
-                playSequence(index + 1);
-            }, segment.pause || 0);
-        });
-    }
-
-    function typeWriterSegment(text, i, speed, onComplete) {
-        if (i < text.length) {
-            messageEl.innerHTML += (text.charAt(i) === '\n') ? '<br>' : text.charAt(i);
-            setTimeout(() => typeWriterSegment(text, i + 1, speed, onComplete), speed);
-        } else {
-            if (onComplete) onComplete();
-        }
-    }
-
-    function showSignature() {
-        signature.style.opacity = '1';
-        signaturePath.style.animationPlayState = 'running';
-    }
-</script>
-
-</body>
-</html>
+    async function initMicrophone
