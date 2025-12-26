@@ -37,7 +37,7 @@
         }
 
         #timeline1 { z-index: 10; }
-        #timeline2 { z-index: 5; } /* 預設在下層 */
+        #timeline2 { z-index: 5; }
 
         video.visible {
             opacity: 1;
@@ -140,15 +140,33 @@
             z-index: 60;
             pointer-events: none;
         }
+
+        /* 版本號顯示 (除錯用) */
+        #version-tag {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            color: rgba(255,255,255,0.3);
+            font-size: 10px;
+            z-index: 100;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
 
 <div id="container">
+    <div id="version-tag">Ver 3.0</div>
 
-    <video id="timeline1" src="timeline1.mov?v=1" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline1" playsinline webkit-playsinline loop muted preload="auto">
+        <source src="timeline1.mp4?v=3" type="video/mp4">
+        <source src="timeline1.mov?v=3" type="video/quicktime">
+    </video>
     
-    <video id="timeline2" src="timeline2.mov?v=1" playsinline webkit-playsinline muted preload="auto"></video>
+    <video id="timeline2" playsinline webkit-playsinline muted preload="auto">
+        <source src="timeline2.mp4?v=3" type="video/mp4">
+        <source src="timeline2.mov?v=3" type="video/quicktime">
+    </video>
 
     <div id="start-screen">
         <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
@@ -180,3 +198,160 @@
     const blowHint = document.getElementById('blow-hint');
 
     const greetingText = "願你的每一個願望都能成真\n新的一年，平安喜樂\n生日快樂";
+    const textSpeed = 100;
+    
+    let audioContext, analyser, microphone;
+    let isBlowing = false;
+
+    // --- 錯誤監聽 ---
+    // 如果播放失敗，會顯示非常詳細的錯誤
+    const handleError = (e, vName) => {
+        console.log(vName + " error:", e);
+    };
+    timeline1.addEventListener('error', (e) => handleError(e, 't1'));
+    timeline2.addEventListener('error', (e) => handleError(e, 't2'));
+
+    // --- 1. 使用者點擊按鈕 ---
+    wishBtn.addEventListener('click', async () => {
+        // 介面轉換
+        startScreen.style.opacity = '0';
+        setTimeout(() => startScreen.style.display = 'none', 1000);
+
+        // A. 預先載入策略 (iOS 必須)
+        // 強制先讓 timeline2 變成播放狀態一瞬間，然後立刻暫停
+        // 這樣可以獲得「播放權限」
+        timeline2.play().then(() => {
+            timeline2.pause();
+            timeline2.currentTime = 0;
+        }).catch(e => {
+            console.log("預先授權失敗(稍後重試):", e);
+        });
+
+        // B. 播放 Timeline 1
+        timeline1.classList.add('visible');
+        try {
+            await timeline1.play();
+        } catch (e) {
+            timeline1.muted = true;
+            timeline1.play();
+        }
+
+        // C. 顯示提示
+        blowHint.innerHTML = "偵測麥克風中...請對著手機底部吹氣<br><span style='font-size:0.8em'>(若無法吹熄，請直接點擊畫面)</span>";
+        blowHint.style.opacity = '1';
+
+        // D. 啟用備用方案 (點擊螢幕)
+        setTimeout(() => {
+            document.addEventListener('click', manualBlowOut);
+            document.addEventListener('touchstart', manualBlowOut);
+        }, 1000);
+
+        // E. 啟動麥克風
+        try {
+            await initMicrophone();
+            detectBlow();
+        } catch (err) {
+            blowHint.innerHTML = "麥克風無法啟用<br>請直接點擊螢幕吹熄蠟燭";
+        }
+    });
+
+    // --- 2. 備用：手動點擊觸發 ---
+    function manualBlowOut() {
+        if (!isBlowing) {
+            triggerBlowOut();
+        }
+    }
+
+    // --- 3. 麥克風設定 ---
+    async function initMicrophone() {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+        analyser.fftSize = 256;
+    }
+
+    // --- 4. 偵測吹氣 ---
+    function detectBlow() {
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        function checkAudio() {
+            if (isBlowing) return;
+            analyser.getByteFrequencyData(dataArray);
+            
+            let sum = 0;
+            for(let i = 0; i < bufferLength; i++) sum += dataArray[i];
+            let average = sum / bufferLength;
+
+            if (average > 45) { 
+                triggerBlowOut();
+            } else {
+                requestAnimationFrame(checkAudio);
+            }
+        }
+        checkAudio();
+    }
+
+    // --- 5. 觸發切換 (最終播放修正) ---
+    function triggerBlowOut() {
+        if(isBlowing) return;
+        isBlowing = true;
+        
+        document.removeEventListener('click', manualBlowOut);
+        document.removeEventListener('touchstart', manualBlowOut);
+        blowHint.style.opacity = '0';
+
+        // 層級蓋過 timeline1
+        timeline2.style.zIndex = "100"; 
+        
+        // 播放 timeline2
+        var playPromise = timeline2.play();
+
+        if (playPromise !== undefined) {
+            playPromise.then(_ => {
+                // 播放成功
+                timeline2.classList.add('visible');
+                setTimeout(() => {
+                    timeline1.classList.remove('visible');
+                    timeline1.pause();
+                }, 100);
+            })
+            .catch(error => {
+                // 播放失敗時的處理
+                alert("播放失敗: " + error.message + "\n(請確認右下角是否顯示 Ver 3.0，若無請重整)");
+            });
+        }
+
+        timeline2.onended = () => {
+            showCard();
+        };
+    }
+
+    // --- 6. 顯示賀卡 ---
+    function showCard() {
+        timeline2.style.opacity = '0';
+        cardScreen.style.opacity = '1';
+        
+        narration.play().catch(e => console.log("Audio Autoplay Restricted"));
+        typeWriter(greetingText, 0);
+    }
+
+    function typeWriter(text, i) {
+        if (i < text.length) {
+            messageEl.innerHTML += (text.charAt(i) === '\n') ? '<br>' : text.charAt(i);
+            setTimeout(() => typeWriter(text, i + 1), textSpeed);
+        } else {
+            showSignature();
+        }
+    }
+
+    function showSignature() {
+        signature.style.opacity = '1';
+        signaturePath.style.animationPlayState = 'running';
+    }
+</script>
+
+</body>
+</html>
