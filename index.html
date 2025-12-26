@@ -158,9 +158,9 @@
 
 <div id="container">
 
-    <video id="timeline1" src="timeline1.mov" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline1" src="timeline1.mp4" playsinline webkit-playsinline loop muted preload="auto"></video>
     
-    <video id="timeline2" src="timeline2.mov" playsinline webkit-playsinline muted preload="auto"></video>
+    <video id="timeline2" src="timeline2.mp4" playsinline webkit-playsinline muted preload="auto"></video>
 
     <div id="start-screen">
         <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
@@ -201,7 +201,7 @@
 
     // --- 錯誤處理 ---
     timeline1.addEventListener('error', () => {
-        blowHint.innerText = "錯誤：找不到 timeline1.mov，請確認 GitHub 檔名";
+        blowHint.innerText = "錯誤：找不到 timeline1.mp4，請確認 GitHub 檔名";
         blowHint.style.opacity = '1';
     });
     timeline2.addEventListener('error', () => {
@@ -344,3 +344,4 @@
 
 </body>
 </html>
+
