@@ -99,13 +99,13 @@
 
         #message {
             color: #fff;
-            font-size: 1.3rem; /* 字體稍微調小一點以容納較多文字 */
+            font-size: 1.3rem;
             line-height: 1.8;
             letter-spacing: 2px;
             margin-bottom: 30px;
             min-height: 100px;
             text-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            white-space: pre-wrap; /* 保留換行格式 */
+            white-space: pre-wrap; 
         }
 
         #signature {
@@ -156,11 +156,11 @@
 <body>
 
 <div id="container">
-    <div id="version-tag">Ver 6.0 (Final Text)</div>
+    <div id="version-tag">Ver 7.0 (Rhythm)</div>
 
-    <video id="timeline1" src="timeline1.mp4?v=6" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline1" src="timeline1.mp4?v=7" playsinline webkit-playsinline loop muted preload="auto"></video>
     
-    <video id="timeline2" src="timeline2.mp4?v=6" playsinline webkit-playsinline muted preload="auto"></video>
+    <video id="timeline2" src="timeline2.mp4?v=7" playsinline webkit-playsinline muted preload="auto"></video>
 
     <div id="start-screen">
         <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
@@ -190,16 +190,40 @@
     const signaturePath = signature.querySelector('path');
     const narration = document.getElementById('narration');
     const blowHint = document.getElementById('blow-hint');
-
-    // 直接使用您指定的文字
-    const greetingText = "北鼻，生日快樂！\n感謝地心引力，\n讓妳在 12/12 走進我的生命。\n溫柔的妳，總是讓我心疼、讓我瘋狂，\n我會盡我全力，保護這樣的妳。\n每天每天，都在一直想著妳...\n1/7 見面，我會把欠妳的寵愛，\n「親自」送達。\n乖乖等我喔！";
-    
-    // 設定文字速度 (毫秒/字)，150 比較深情
-    const textSpeed = 150;
     
     let audioContext, analyser, microphone;
     let isBlowing = false;
 
+    // --- 腳本設定區 (這裡可以自由調整節奏) ---
+    // speed: 打字速度 (越小越快，100是標準，300是慢動作)
+    // pause: 打完這句後，等待多久才打下一句 (毫秒)
+    const greetingSequence = [
+        { text: "北鼻，", speed: 250, pause: 500 }, // 慢一點，親暱
+        { text: "生日快樂！\n", speed: 100, pause: 1000 }, // 輕快，然後停1秒
+        
+        { text: "感謝地心引力，\n", speed: 120, pause: 300 },
+        { text: "讓妳在 12/12 走進我的生命。\n", speed: 120, pause: 1200 }, // 感性長停頓
+        
+        { text: "溫柔的妳，", speed: 150, pause: 400 },
+        { text: "總是讓我心疼、", speed: 180, pause: 200 },
+        { text: "讓我瘋狂，\n", speed: 180, pause: 800 },
+        
+        { text: "我會盡我全力，", speed: 120, pause: 300 },
+        { text: "保護這樣的妳。\n", speed: 150, pause: 1500 }, // 承諾，長停頓
+        
+        { text: "每天每天，", speed: 150, pause: 200 },
+        { text: "都在一直想著妳...\n", speed: 200, pause: 1500 }, // 思念，慢且長停
+        
+        { text: "1/7 見面，", speed: 120, pause: 500 },
+        { text: "我會把欠妳的寵愛，\n", speed: 120, pause: 800 },
+        
+        { text: "「親自」", speed: 350, pause: 600 }, // 這裡超級慢，強調親自
+        { text: "送達。\n", speed: 150, pause: 1000 },
+        
+        { text: "乖乖等我喔！", speed: 150, pause: 0 }
+    ];
+
+    // --- 錯誤處理 ---
     const handleError = (e, vName) => {
         console.error(vName + " error:", e);
     };
@@ -212,7 +236,7 @@
         startScreen.style.opacity = '0';
         setTimeout(() => startScreen.style.display = 'none', 1000);
 
-        // 預先解鎖影片與聲音
+        // 預先解鎖
         timeline2.play().then(() => {
             timeline2.pause();
             timeline2.currentTime = 0;
@@ -284,7 +308,7 @@
         checkAudio();
     }
 
-    // --- 5. 觸發切換 ---
+    // --- 切換邏輯 ---
     function triggerBlowOut() {
         if(isBlowing) return;
         isBlowing = true;
@@ -310,24 +334,43 @@
         };
     }
 
-    // --- 6. 顯示賀卡 ---
+    // --- 顯示賀卡 (新的逐段顯示邏輯) ---
     function showCard() {
         timeline2.style.opacity = '0';
         cardScreen.style.opacity = '1';
         
-        // 嘗試播放音效 (如果前面有解鎖成功，這裡應該會有聲音)
         narration.play().catch(e => console.log("Audio still restricted:", e));
         
-        // 開始打字 (不再依賴音效長度，直接用固定速度)
-        typeWriter(greetingText, 0);
+        // 開始播放腳本 (從第 0 段開始)
+        playSequence(0);
     }
 
-    function typeWriter(text, i) {
+    // 處理每一段的播放
+    function playSequence(index) {
+        // 如果已經播完所有段落，顯示簽名
+        if (index >= greetingSequence.length) {
+            showSignature();
+            return;
+        }
+
+        const segment = greetingSequence[index];
+        // 執行打字機
+        typeWriterSegment(segment.text, 0, segment.speed, () => {
+            // 這一段打完後，等待 pause 設定的時間，再執行下一段
+            setTimeout(() => {
+                playSequence(index + 1);
+            }, segment.pause || 0);
+        });
+    }
+
+    // 單一段落的打字機
+    function typeWriterSegment(text, i, speed, onComplete) {
         if (i < text.length) {
             messageEl.innerHTML += (text.charAt(i) === '\n') ? '<br>' : text.charAt(i);
-            setTimeout(() => typeWriter(text, i + 1), textSpeed);
+            setTimeout(() => typeWriterSegment(text, i + 1, speed, onComplete), speed);
         } else {
-            showSignature();
+            // 這段文字打完了
+            if (onComplete) onComplete();
         }
     }
 
