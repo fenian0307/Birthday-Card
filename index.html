@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>For My Baby - Allen</title>
+    <style>
+        :root { --gold: #d4af37; --bg: #0a0a0a; }
+        body { margin: 0; background: var(--bg); color: white; font-family: serif; overflow: hidden; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        #stage { position: relative; width: 100%; height: 100%; background: #000; }
+        video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+        #overlay { position: absolute; z-index: 20; bottom: 15%; width: 100%; text-align: center; pointer-events: none; }
+        #subtitle { font-size: 1.3rem; line-height: 1.8; text-shadow: 0 2px 15px rgba(0,0,0,1); opacity: 0; transition: opacity 0.5s; padding: 0 30px; }
+        #signature-wrap { margin-top: 25px; opacity: 0; transition: opacity 2s; display: flex; justify-content: center; }
+        .path { stroke: var(--gold); stroke-width: 2.5; fill: none; stroke-dasharray: 2000; stroke-dashoffset: 2000; stroke-linecap: round; }
+        @keyframes writing { to { stroke-dashoffset: 0; } }
+        #start-btn { position: absolute; z-index: 100; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 15px 30px; border: 1px solid var(--gold); background: rgba(0,0,0,0.6); color: var(--gold); font-size: 1.2rem; cursor: pointer; }
+        #hint { position: absolute; bottom: 8%; width: 100%; text-align: center; color: var(--gold); opacity: 0; transition: 0.8s; font-size: 0.9rem; z-index: 30; }
+    </style>
+</head>
+<body>
+
+    <button id="start-btn">開啟這份溫柔</button>
+    <div id="hint">許個願，吹熄蠟燭...</div>
+
+    <div id="stage">
+        <video id="vid-burn" src="video_burning.mp4" loop muted playsinline style="display:none; z-index:1;"></video>
+        <video id="vid-blown" src="video_blown.mp4" muted playsinline style="display:none; z-index:2;"></video>
+    </div>
+
+    <div id="overlay">
+        <div id="subtitle"></div>
+        <div id="signature-wrap">
+            <svg viewBox="0 0 600 250" width="300">
+                <path class="path" id="sig-path" d="M100,180 C110,130 160,30 190,40 C210,50 160,180 150,210 M110,140 L220,120 M230,190 C240,160 250,80 255,70 C270,60 280,190 290,190 M310,190 C320,160 330,80 335,70 C350,60 360,190 370,190 M390,190 C400,160 440,90 430,130 C420,160 470,190 480,190 M500,190 C510,160 520,90 535,100 C550,110 590,150 620,110" />
+            </svg>
+        </div>
+    </div>
+
+    <audio id="audio-narration" src="narration.mp3"></audio>
+    <audio id="audio-bgm" src="bgm.mp3" loop></audio>
+
+    <script>
+        const script = [
+            { t: 0.2, txt: "Baby，生日快樂" }, //
+            { t: 3.2, txt: "感謝地心引力讓你在 12 月 12 日走進我的生命" }, //
+            { t: 9.0, txt: "溫柔的你總是讓我心疼，讓我瘋狂" }, //
+            { t: 14.2, txt: "我會盡我全力保護這樣的你" }, //
+            { t: 17.5, txt: "每天每天都一直想著你" }, //
+            { t: 21.0, txt: "1 月 7 號見面，我會把欠你的寵愛親自送達" }, //
+            { t: 26.0, txt: "乖乖等我喔" } //
+        ];
+
+        const startBtn = document.getElementById('start-btn');
+        const hint = document.getElementById('hint');
+        const vidBurn = document.getElementById('vid-burn');
+        const vidBlown = document.getElementById('vid-blown');
+        const narration = document.getElementById('audio-narration');
+        const bgm = document.getElementById('audio-bgm');
+
+        // 偵測影片載入失敗
+        [vidBurn, vidBlown].forEach(v => {
+            v.onerror = () => alert("影片 " + v.src + " 載入失敗，請檢查檔名是否正確！");
+        });
+
+        startBtn.onclick = () => {
+            startBtn.style.display = 'none';
+            vidBurn.style.display = 'block';
+            vidBurn.play().catch(e => console.log("播放失敗:", e));
+            bgm.volume = 0.2;
+            bgm.play();
+            hint.style.opacity = 1;
+            initMic();
+        };
+
+        function initMic() {
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const analyzer = ctx.createAnalyser();
+                ctx.createMediaStreamSource(stream).connect(analyzer);
+                const data = new Uint8Array(analyzer.frequencyBinCount);
+                function detect() {
+                    analyzer.getByteFrequencyData(data);
+                    const vol = data.reduce((a, b) => a + b) / data.length;
+                    // 只要偵測到一次大音量就觸發
+                    if (vol > 40) {
+                        triggerBlow();
+                    } else {
+                        requestAnimationFrame(detect);
+                    }
+                }
+                detect();
+            }).catch(() => {
+                // 如果手機不支援麥克風，點擊螢幕也可以觸發
+                document.body.onclick = triggerBlow;
+            });
+        }
+
+        function triggerBlow() {
+            hint.style.opacity = 0;
+            // 顯示熄滅影片，並確保它在最上層
+            vidBlown.style.display = 'block';
+            vidBlown.play();
+            
+            // 熄滅影片播完後的操作
+            vidBlown.onended = () => {
+                // 不要隱藏 vidBlown，讓畫面停在最後一幀（煙霧）
+                narration.play();
+                startSync();
+            };
+            
+            // 延遲一點點再隱藏燃燒影片，避免閃黑頻
+            setTimeout(() => {
+                vidBurn.style.display = 'none';
+            }, 100);
+        }
+
+        function startSync() {
+            const sub = document.getElementById('subtitle');
+            const sig = document.getElementById('signature-wrap');
+            const path = document.getElementById('sig-path');
+            narration.ontimeupdate = () => {
+                const now = narration.currentTime;
+                const line = script.find((l, i) => now >= l.t && (!script[i+1] || now < script[i+1].t));
+                if (line) {
+                    sub.innerText = line.txt;
+                    sub.style.opacity = 1;
+                }
+                if (now > 25.5) {
+                    sig.style.opacity = 1;
+                    path.style.animation = "writing 4.5s forwards ease-in-out";
+                }
+            };
+        }
+    </script>
+</body>
+</html>
