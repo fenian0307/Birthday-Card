@@ -24,7 +24,6 @@
             height: 100%;
         }
 
-        /* 影片層設定 */
         video {
             position: absolute;
             top: 0;
@@ -37,22 +36,13 @@
             pointer-events: none;
         }
 
-        /* 蠟燭循環影片 (預設層級 10) */
-        #timeline1 {
-            z-index: 10;
-        }
+        #timeline1 { z-index: 10; }
+        #timeline2 { z-index: 5; } /* 預設在下層 */
 
-        /* 吹熄影片 (預設層級 5，觸發時會改為 20) */
-        #timeline2 {
-            z-index: 5; 
-        }
-
-        /* 控制顯示狀態 */
         video.visible {
             opacity: 1;
         }
 
-        /* 開始按鈕層 */
         #start-screen {
             position: absolute;
             top: 0;
@@ -87,7 +77,6 @@
             100% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 215, 0, 0.2); }
         }
 
-        /* 賀卡內容層 */
         #card-screen {
             position: absolute;
             top: 0;
@@ -139,7 +128,6 @@
             to { stroke-dashoffset: 0; }
         }
 
-        /* 底部提示文字 */
         .hint {
             position: absolute;
             bottom: 10%;
@@ -158,9 +146,9 @@
 
 <div id="container">
 
-    <video id="timeline1" src="timeline1.mp4" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline1" src="timeline1.mov?v=1" playsinline webkit-playsinline loop muted preload="auto"></video>
     
-    <video id="timeline2" src="timeline2.mp4" playsinline webkit-playsinline muted preload="auto"></video>
+    <video id="timeline2" src="timeline2.mov?v=1" playsinline webkit-playsinline muted preload="auto"></video>
 
     <div id="start-screen">
         <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
@@ -180,7 +168,6 @@
 </div>
 
 <script>
-    // DOM 元素選取
     const startScreen = document.getElementById('start-screen');
     const wishBtn = document.getElementById('wish-btn');
     const timeline1 = document.getElementById('timeline1');
@@ -192,156 +179,4 @@
     const narration = document.getElementById('narration');
     const blowHint = document.getElementById('blow-hint');
 
-    // 參數設定
     const greetingText = "願你的每一個願望都能成真\n新的一年，平安喜樂\n生日快樂";
-    const textSpeed = 100;
-    
-    let audioContext, analyser, microphone;
-    let isBlowing = false;
-
-    // --- 錯誤處理 ---
-    timeline1.addEventListener('error', () => {
-        blowHint.innerText = "錯誤：找不到 timeline1.mp4，請確認 GitHub 檔名";
-        blowHint.style.opacity = '1';
-    });
-    timeline2.addEventListener('error', () => {
-        console.error("Timeline2 載入失敗");
-    });
-
-    // --- 1. 使用者點擊按鈕 ---
-    wishBtn.addEventListener('click', async () => {
-        // 介面轉換
-        startScreen.style.opacity = '0';
-        setTimeout(() => startScreen.style.display = 'none', 1000);
-
-        // 預先載入 Timeline 2 (防止吹氣時卡頓)
-        timeline2.load();
-        
-        // 播放 Timeline 1 (蠟燭循環)
-        timeline1.classList.add('visible');
-        try {
-            await timeline1.play();
-        } catch (e) {
-            // 若自動播放失敗，改為靜音播放
-            timeline1.muted = true;
-            timeline1.play();
-        }
-
-        // 顯示吹氣提示
-        blowHint.innerHTML = "偵測麥克風中...請對著手機底部吹氣<br><span style='font-size:0.8em'>(若無法吹熄，請直接點擊畫面)</span>";
-        blowHint.style.opacity = '1';
-
-        // 啟用備用方案 (點擊螢幕)
-        setTimeout(() => {
-            document.addEventListener('click', manualBlowOut);
-            document.addEventListener('touchstart', manualBlowOut);
-        }, 1000);
-
-        // 啟動麥克風
-        try {
-            await initMicrophone();
-            detectBlow();
-        } catch (err) {
-            blowHint.innerHTML = "麥克風無法啟用<br>請直接點擊螢幕吹熄蠟燭";
-        }
-    });
-
-    // --- 2. 備用：手動點擊觸發 ---
-    function manualBlowOut() {
-        if (!isBlowing) {
-            triggerBlowOut();
-        }
-    }
-
-    // --- 3. 麥克風設定 ---
-    async function initMicrophone() {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        microphone = audioContext.createMediaStreamSource(stream);
-        microphone.connect(analyser);
-        analyser.fftSize = 256;
-    }
-
-    // --- 4. 偵測吹氣 ---
-    function detectBlow() {
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        
-        function checkAudio() {
-            if (isBlowing) return;
-            analyser.getByteFrequencyData(dataArray);
-            
-            let sum = 0;
-            for(let i = 0; i < bufferLength; i++) sum += dataArray[i];
-            let average = sum / bufferLength;
-
-            // 閾值設定 (大於 45 視為吹氣)
-            if (average > 45) { 
-                triggerBlowOut();
-            } else {
-                requestAnimationFrame(checkAudio);
-            }
-        }
-        checkAudio();
-    }
-
-    // --- 5. 觸發切換 (核心) ---
-    function triggerBlowOut() {
-        if(isBlowing) return;
-        isBlowing = true;
-        
-        // 移除點擊監聽與提示
-        document.removeEventListener('click', manualBlowOut);
-        document.removeEventListener('touchstart', manualBlowOut);
-        blowHint.style.opacity = '0';
-
-        // 強制設定 timeline2 層級為最高，覆蓋 timeline1
-        timeline2.style.zIndex = "100"; 
-        
-        // 播放 timeline2
-        timeline2.play().then(() => {
-            // 播放成功後，顯示 timeline2 並隱藏 timeline1
-            timeline2.classList.add('visible');
-            timeline1.classList.remove('visible');
-            
-            // 稍後暫停 timeline1 以節省資源
-            setTimeout(() => timeline1.pause(), 200);
-
-        }).catch(e => {
-            alert("播放失敗，請檢查網路連線");
-        });
-
-        // 監聽 timeline2 播放結束
-        timeline2.onended = () => {
-            showCard();
-        };
-    }
-
-    // --- 6. 顯示賀卡 ---
-    function showCard() {
-        timeline2.style.opacity = '0';
-        cardScreen.style.opacity = '1';
-        
-        narration.play().catch(e => console.log("音效自動播放受限"));
-        typeWriter(greetingText, 0);
-    }
-
-    function typeWriter(text, i) {
-        if (i < text.length) {
-            messageEl.innerHTML += (text.charAt(i) === '\n') ? '<br>' : text.charAt(i);
-            setTimeout(() => typeWriter(text, i + 1), textSpeed);
-        } else {
-            showSignature();
-        }
-    }
-
-    function showSignature() {
-        signature.style.opacity = '1';
-        signaturePath.style.animationPlayState = 'running';
-    }
-</script>
-
-</body>
-</html>
-
