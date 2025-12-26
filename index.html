@@ -156,6 +156,159 @@
 <body>
 
 <div id="container">
-    <div id="version-tag">Ver 10.0 (Stable)</div>
+    <div id="version-tag">Ver 8.1 (BGM Fix)</div>
 
-    <video id="timeline1" src="timeline1.mp4?v=10" playsinline webkit
+    <video id="timeline1" src="timeline1.mp4?v=8" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline2" src="timeline2.mp4?v=8" playsinline webkit-playsinline muted preload="auto"></video>
+
+    <div id="start-screen">
+        <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
+    </div>
+
+    <div id="blow-hint" class="hint"></div>
+
+    <div id="card-screen">
+        <div id="message"></div> 
+        <svg id="signature" viewBox="0 0 300 100">
+            <path d="M40,80 Q50,10 60,80 Q70,40 80,60 L90,80 M95,60 L105,60 M110,80 L110,30 L120,80 M130,80 L130,30 L140,80 M150,60 Q160,50 170,60 T180,60 L190,60 Q200,50 190,70 T180,80" />
+        </svg>
+    </div>
+
+    <audio id="narration" src="narration.mp3" preload="auto"></audio>
+    <audio id="bgm" src="cute.mp3" preload="auto" loop></audio>
+
+</div>
+
+<script>
+    const startScreen = document.getElementById('start-screen');
+    const wishBtn = document.getElementById('wish-btn');
+    const timeline1 = document.getElementById('timeline1');
+    const timeline2 = document.getElementById('timeline2');
+    const cardScreen = document.getElementById('card-screen');
+    const messageEl = document.getElementById('message');
+    const signature = document.getElementById('signature');
+    const signaturePath = signature.querySelector('path');
+    const narration = document.getElementById('narration');
+    const bgm = document.getElementById('bgm'); // 抓取 BGM 元素
+    const blowHint = document.getElementById('blow-hint');
+    
+    let audioContext, analyser, microphone;
+    let isBlowing = false;
+
+    // --- 腳本設定區 (Ver 8.0 的完美節奏) ---
+    const greetingSequence = [
+        { text: "北鼻，", speed: 250, pause: 500 }, 
+        { text: "生日快樂！\n", speed: 150, pause: 1200 }, 
+        { text: "感謝地心引力，\n", speed: 180, pause: 400 },
+        { text: "讓妳在 12/12 走進我的生命。\n", speed: 160, pause: 1500 }, 
+        { text: "溫柔的妳，", speed: 200, pause: 400 },
+        { text: "總是讓我心疼、", speed: 180, pause: 200 },
+        { text: "讓我瘋狂，\n", speed: 180, pause: 1200 },
+        { text: "我會盡我全力，", speed: 180, pause: 300 },
+        { text: "保護這樣的妳。\n", speed: 180, pause: 1800 }, 
+        { text: "每天每天，", speed: 200, pause: 400 },
+        { text: "都在一直想著妳...\n", speed: 220, pause: 1500 }, 
+        { text: "1/7 見面，", speed: 160, pause: 500 },
+        { text: "我會把欠妳的寵愛，\n", speed: 160, pause: 600 },
+        { text: "「親自」", speed: 350, pause: 500 }, 
+        { text: "送達。\n", speed: 150, pause: 1500 },
+        { text: "乖乖等我喔！", speed: 150, pause: 0 }
+    ];
+
+    // --- 錯誤處理 ---
+    const handleError = (e, vName) => {
+        console.error(vName + " error:", e);
+    };
+    timeline1.addEventListener('error', (e) => handleError(e, 't1'));
+    timeline2.addEventListener('error', (e) => handleError(e, 't2'));
+    narration.addEventListener('error', (e) => handleError(e, 'audio'));
+    if(bgm) bgm.addEventListener('error', (e) => handleError(e, 'bgm'));
+
+    // --- 1. 使用者點擊按鈕 ---
+    wishBtn.addEventListener('click', async () => {
+        startScreen.style.opacity = '0';
+        setTimeout(() => startScreen.style.display = 'none', 1000);
+
+        // A. 預先解鎖 (加入 BGM 的解鎖)
+        // 使用 Promise.allSettled 確保即使其中一個失敗，也不會卡住流程
+        Promise.allSettled([
+            timeline2.play().then(() => { timeline2.pause(); timeline2.currentTime = 0; }),
+            narration.play().then(() => { narration.pause(); narration.currentTime = 0; }),
+            bgm ? bgm.play().then(() => { bgm.pause(); bgm.currentTime = 0; }) : Promise.resolve()
+        ]).then(() => {
+            console.log("Media unlocked");
+        });
+
+        // B. 播放 Timeline 1
+        timeline1.classList.add('visible');
+        try {
+            await timeline1.play();
+        } catch (e) {
+            timeline1.muted = true;
+            timeline1.play();
+        }
+
+        blowHint.innerHTML = "偵測麥克風中...請對著手機底部吹氣<br><span style='font-size:0.8em'>(若無法吹熄，請直接點擊畫面)</span>";
+        blowHint.style.opacity = '1';
+
+        setTimeout(() => {
+            document.addEventListener('click', manualBlowOut);
+            document.addEventListener('touchstart', manualBlowOut);
+        }, 1000);
+
+        try {
+            await initMicrophone();
+            detectBlow();
+        } catch (err) {
+            blowHint.innerHTML = "麥克風無法啟用<br>請直接點擊螢幕吹熄蠟燭";
+        }
+    });
+
+    function manualBlowOut() {
+        if (!isBlowing) {
+            triggerBlowOut();
+        }
+    }
+
+    async function initMicrophone() {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+        analyser.fftSize = 256;
+    }
+
+    function detectBlow() {
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        function checkAudio() {
+            if (isBlowing) return;
+            analyser.getByteFrequencyData(dataArray);
+            
+            let sum = 0;
+            for(let i = 0; i < bufferLength; i++) sum += dataArray[i];
+            let average = sum / bufferLength;
+
+            if (average > 45) { 
+                triggerBlowOut();
+            } else {
+                requestAnimationFrame(checkAudio);
+            }
+        }
+        checkAudio();
+    }
+
+    // --- 切換邏輯 ---
+    function triggerBlowOut() {
+        if(isBlowing) return;
+        isBlowing = true;
+        
+        document.removeEventListener('click', manualBlowOut);
+        document.removeEventListener('touchstart', manualBlowOut);
+        blowHint.style.opacity = '0';
+
+        timeline2.style.zIndex = "100"; 
+        
+        timeline
