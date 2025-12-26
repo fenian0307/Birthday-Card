@@ -156,11 +156,11 @@
 <body>
 
 <div id="container">
-    <div id="version-tag">Ver 7.0 (Rhythm)</div>
+    <div id="version-tag">Ver 8.0 (Synced)</div>
 
-    <video id="timeline1" src="timeline1.mp4?v=7" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline1" src="timeline1.mp4?v=8" playsinline webkit-playsinline loop muted preload="auto"></video>
     
-    <video id="timeline2" src="timeline2.mp4?v=7" playsinline webkit-playsinline muted preload="auto"></video>
+    <video id="timeline2" src="timeline2.mp4?v=8" playsinline webkit-playsinline muted preload="auto"></video>
 
     <div id="start-screen">
         <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
@@ -194,32 +194,54 @@
     let audioContext, analyser, microphone;
     let isBlowing = false;
 
-    // --- 腳本設定區 (這裡可以自由調整節奏) ---
-    // speed: 打字速度 (越小越快，100是標準，300是慢動作)
-    // pause: 打完這句後，等待多久才打下一句 (毫秒)
+    // --- 腳本設定區 (已根據口白 narration.mp3 微調節奏) ---
     const greetingSequence = [
-        { text: "北鼻，", speed: 250, pause: 500 }, // 慢一點，親暱
-        { text: "生日快樂！\n", speed: 100, pause: 1000 }, // 輕快，然後停1秒
+        // 00:00 "北鼻，" (語氣溫柔，稍慢)
+        { text: "北鼻，", speed: 250, pause: 500 }, 
         
-        { text: "感謝地心引力，\n", speed: 120, pause: 300 },
-        { text: "讓妳在 12/12 走進我的生命。\n", speed: 120, pause: 1200 }, // 感性長停頓
+        // 00:01 "生日快樂！" (語氣輕快，後面接長停頓等待下一句)
+        { text: "生日快樂！\n", speed: 150, pause: 1200 }, 
         
-        { text: "溫柔的妳，", speed: 150, pause: 400 },
+        // 00:03 "感謝地心引力，"
+        { text: "感謝地心引力，\n", speed: 180, pause: 400 },
+        
+        // 00:05 "讓妳在 12/12 走進我的生命。" (這句稍長，穩穩地打完)
+        { text: "讓妳在 12/12 走進我的生命。\n", speed: 160, pause: 1500 }, 
+        
+        // 00:10 "溫柔的妳，"
+        { text: "溫柔的妳，", speed: 200, pause: 400 },
+        
+        // 00:11 "總是讓我心疼、"
         { text: "總是讓我心疼、", speed: 180, pause: 200 },
-        { text: "讓我瘋狂，\n", speed: 180, pause: 800 },
         
-        { text: "我會盡我全力，", speed: 120, pause: 300 },
-        { text: "保護這樣的妳。\n", speed: 150, pause: 1500 }, // 承諾，長停頓
+        // 00:13 "讓我瘋狂，" (後面有明顯換氣停頓)
+        { text: "讓我瘋狂，\n", speed: 180, pause: 1200 },
         
-        { text: "每天每天，", speed: 150, pause: 200 },
-        { text: "都在一直想著妳...\n", speed: 200, pause: 1500 }, // 思念，慢且長停
+        // 00:15 "我會盡我全力，"
+        { text: "我會盡我全力，", speed: 180, pause: 300 },
         
-        { text: "1/7 見面，", speed: 120, pause: 500 },
-        { text: "我會把欠妳的寵愛，\n", speed: 120, pause: 800 },
+        // 00:17 "保護這樣的妳。" (承諾的語氣，堅定)
+        { text: "保護這樣的妳。\n", speed: 180, pause: 1800 }, 
         
-        { text: "「親自」", speed: 350, pause: 600 }, // 這裡超級慢，強調親自
-        { text: "送達。\n", speed: 150, pause: 1000 },
+        // 00:20 "每天每天，" (語氣重複，節奏分明)
+        { text: "每天每天，", speed: 200, pause: 400 },
         
+        // 00:22 "都在一直想著妳..." (這句拉比較長，很有感情)
+        { text: "都在一直想著妳...\n", speed: 220, pause: 1500 }, 
+        
+        // 00:25 "1/7 見面，" (語氣轉折，帶有期待)
+        { text: "1/7 見面，", speed: 160, pause: 500 },
+        
+        // 00:27 "我會把欠妳的寵愛，"
+        { text: "我會把欠妳的寵愛，\n", speed: 160, pause: 600 },
+        
+        // 00:29 "「親自」" (重音強調，這裡調得特別慢)
+        { text: "「親自」", speed: 350, pause: 500 }, 
+        
+        // 00:31 "送達。" (簡短有力)
+        { text: "送達。\n", speed: 150, pause: 1500 },
+        
+        // 00:33 "乖乖等我喔！" (結尾俏皮甜蜜)
         { text: "乖乖等我喔！", speed: 150, pause: 0 }
     ];
 
@@ -334,29 +356,25 @@
         };
     }
 
-    // --- 顯示賀卡 (新的逐段顯示邏輯) ---
+    // --- 顯示賀卡 ---
     function showCard() {
         timeline2.style.opacity = '0';
         cardScreen.style.opacity = '1';
         
         narration.play().catch(e => console.log("Audio still restricted:", e));
         
-        // 開始播放腳本 (從第 0 段開始)
         playSequence(0);
     }
 
     // 處理每一段的播放
     function playSequence(index) {
-        // 如果已經播完所有段落，顯示簽名
         if (index >= greetingSequence.length) {
             showSignature();
             return;
         }
 
         const segment = greetingSequence[index];
-        // 執行打字機
         typeWriterSegment(segment.text, 0, segment.speed, () => {
-            // 這一段打完後，等待 pause 設定的時間，再執行下一段
             setTimeout(() => {
                 playSequence(index + 1);
             }, segment.pause || 0);
@@ -369,7 +387,6 @@
             messageEl.innerHTML += (text.charAt(i) === '\n') ? '<br>' : text.charAt(i);
             setTimeout(() => typeWriterSegment(text, i + 1, speed, onComplete), speed);
         } else {
-            // 這段文字打完了
             if (onComplete) onComplete();
         }
     }
