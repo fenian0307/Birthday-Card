@@ -156,11 +156,11 @@
 <body>
 
 <div id="container">
-    <div id="version-tag">Ver 8.0 (Synced)</div>
+    <div id="version-tag">Ver 9.0 (BGM Mix)</div>
 
-    <video id="timeline1" src="timeline1.mp4?v=8" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline1" src="timeline1.mp4?v=9" playsinline webkit-playsinline loop muted preload="auto"></video>
     
-    <video id="timeline2" src="timeline2.mp4?v=8" playsinline webkit-playsinline muted preload="auto"></video>
+    <video id="timeline2" src="timeline2.mp4?v=9" playsinline webkit-playsinline muted preload="auto"></video>
 
     <div id="start-screen">
         <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
@@ -176,6 +176,7 @@
     </div>
 
     <audio id="narration" src="narration.mp3" preload="auto"></audio>
+    <audio id="bgm" src="cute.mp3" preload="auto" loop></audio>
 
 </div>
 
@@ -189,59 +190,29 @@
     const signature = document.getElementById('signature');
     const signaturePath = signature.querySelector('path');
     const narration = document.getElementById('narration');
+    const bgm = document.getElementById('bgm'); // 新增背景音樂變數
     const blowHint = document.getElementById('blow-hint');
     
     let audioContext, analyser, microphone;
     let isBlowing = false;
 
-    // --- 腳本設定區 (已根據口白 narration.mp3 微調節奏) ---
+    // --- 腳本設定區 ---
     const greetingSequence = [
-        // 00:00 "北鼻，" (語氣溫柔，稍慢)
         { text: "北鼻，", speed: 250, pause: 500 }, 
-        
-        // 00:01 "生日快樂！" (語氣輕快，後面接長停頓等待下一句)
         { text: "生日快樂！\n", speed: 150, pause: 1200 }, 
-        
-        // 00:03 "感謝地心引力，"
         { text: "感謝地心引力，\n", speed: 180, pause: 400 },
-        
-        // 00:05 "讓妳在 12/12 走進我的生命。" (這句稍長，穩穩地打完)
         { text: "讓妳在 12/12 走進我的生命。\n", speed: 160, pause: 1500 }, 
-        
-        // 00:10 "溫柔的妳，"
         { text: "溫柔的妳，", speed: 200, pause: 400 },
-        
-        // 00:11 "總是讓我心疼、"
         { text: "總是讓我心疼、", speed: 180, pause: 200 },
-        
-        // 00:13 "讓我瘋狂，" (後面有明顯換氣停頓)
         { text: "讓我瘋狂，\n", speed: 180, pause: 1200 },
-        
-        // 00:15 "我會盡我全力，"
         { text: "我會盡我全力，", speed: 180, pause: 300 },
-        
-        // 00:17 "保護這樣的妳。" (承諾的語氣，堅定)
         { text: "保護這樣的妳。\n", speed: 180, pause: 1800 }, 
-        
-        // 00:20 "每天每天，" (語氣重複，節奏分明)
         { text: "每天每天，", speed: 200, pause: 400 },
-        
-        // 00:22 "都在一直想著妳..." (這句拉比較長，很有感情)
         { text: "都在一直想著妳...\n", speed: 220, pause: 1500 }, 
-        
-        // 00:25 "1/7 見面，" (語氣轉折，帶有期待)
         { text: "1/7 見面，", speed: 160, pause: 500 },
-        
-        // 00:27 "我會把欠妳的寵愛，"
         { text: "我會把欠妳的寵愛，\n", speed: 160, pause: 600 },
-        
-        // 00:29 "「親自」" (重音強調，這裡調得特別慢)
         { text: "「親自」", speed: 350, pause: 500 }, 
-        
-        // 00:31 "送達。" (簡短有力)
         { text: "送達。\n", speed: 150, pause: 1500 },
-        
-        // 00:33 "乖乖等我喔！" (結尾俏皮甜蜜)
         { text: "乖乖等我喔！", speed: 150, pause: 0 }
     ];
 
@@ -251,23 +222,31 @@
     };
     timeline1.addEventListener('error', (e) => handleError(e, 't1'));
     timeline2.addEventListener('error', (e) => handleError(e, 't2'));
-    narration.addEventListener('error', (e) => handleError(e, 'audio'));
+    narration.addEventListener('error', (e) => handleError(e, 'narration'));
+    bgm.addEventListener('error', (e) => handleError(e, 'bgm'));
 
     // --- 1. 使用者點擊按鈕 ---
     wishBtn.addEventListener('click', async () => {
         startScreen.style.opacity = '0';
         setTimeout(() => startScreen.style.display = 'none', 1000);
 
-        // 預先解鎖
+        // 預先解鎖影片
         timeline2.play().then(() => {
             timeline2.pause();
             timeline2.currentTime = 0;
         }).catch(e => console.log("Video unlock failed:", e));
 
+        // 預先解鎖口白
         narration.play().then(() => {
             narration.pause();
             narration.currentTime = 0;
-        }).catch(e => console.log("Audio unlock failed:", e));
+        }).catch(e => console.log("Narration unlock failed:", e));
+
+        // 預先解鎖背景音樂 (關鍵)
+        bgm.play().then(() => {
+            bgm.pause();
+            bgm.currentTime = 0;
+        }).catch(e => console.log("BGM unlock failed:", e));
 
         // 播放 Timeline 1
         timeline1.classList.add('visible');
@@ -356,13 +335,34 @@
         };
     }
 
-    // --- 顯示賀卡 ---
+    // --- 顯示賀卡 (含混音邏輯) ---
     function showCard() {
         timeline2.style.opacity = '0';
         cardScreen.style.opacity = '1';
         
-        narration.play().catch(e => console.log("Audio still restricted:", e));
+        // 1. 設定音量
+        narration.volume = 1.0; // 口白最大聲
+        bgm.volume = 0.3;       // 背景音樂 30% 音量 (不搶戲)
         
+        // 2. 同時播放
+        bgm.play().catch(e => console.log("BGM play error:", e));
+        narration.play().catch(e => console.log("Narration play error:", e));
+        
+        // 3. 監聽口白結束事件，將背景音樂轉大聲
+        narration.onended = () => {
+            // 使用漸強效果 (Fade In)
+            let vol = 0.3;
+            const fadeInterval = setInterval(() => {
+                if (vol < 1.0) {
+                    vol += 0.05; // 每次加 5%
+                    bgm.volume = Math.min(vol, 1.0);
+                } else {
+                    clearInterval(fadeInterval);
+                }
+            }, 200); // 每 0.2 秒調整一次
+        };
+        
+        // 4. 開始打字
         playSequence(0);
     }
 
@@ -381,7 +381,6 @@
         });
     }
 
-    // 單一段落的打字機
     function typeWriterSegment(text, i, speed, onComplete) {
         if (i < text.length) {
             messageEl.innerHTML += (text.charAt(i) === '\n') ? '<br>' : text.charAt(i);
