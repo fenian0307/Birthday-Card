@@ -3,19 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Make a Wish</title>
+    <title>生日快樂 🎂</title>
     <style>
-        body, html {
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
             width: 100%;
             height: 100%;
             background-color: #000;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            -webkit-font-smoothing: antialiased;
         }
 
         #container {
@@ -24,6 +26,7 @@
             height: 100%;
         }
 
+        /* 影片層優化 */
         video {
             position: absolute;
             top: 0;
@@ -34,15 +37,14 @@
             opacity: 0;
             transition: opacity 0.5s ease;
             pointer-events: none;
+            will-change: opacity; /* GPU 加速 */
         }
 
         #timeline1 { z-index: 10; }
         #timeline2 { z-index: 5; }
+        video.visible { opacity: 1; }
 
-        video.visible {
-            opacity: 1;
-        }
-
+        /* 開始畫面 */
         #start-screen {
             position: absolute;
             top: 0;
@@ -52,31 +54,62 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 50;
-            background: #000;
+            z-index: 999;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             transition: opacity 1s ease;
         }
 
         #wish-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.4);
             color: #fff;
-            padding: 20px 40px;
+            padding: 25px 45px;
             font-size: 1.2rem;
             border-radius: 30px;
             cursor: pointer;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
             animation: pulse 2s infinite;
             -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            line-height: 1.6;
         }
 
         @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 215, 0, 0.2); }
-            50% { transform: scale(1.05); box-shadow: 0 0 25px rgba(255, 215, 0, 0.5); }
-            100% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 215, 0, 0.2); }
+            0%, 100% { 
+                transform: scale(1); 
+                box-shadow: 0 8px 32px rgba(255, 215, 0, 0.3); 
+            }
+            50% { 
+                transform: scale(1.05); 
+                box-shadow: 0 12px 48px rgba(255, 215, 0, 0.6); 
+            }
         }
 
+        #wish-btn span {
+            display: block;
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-top: 8px;
+        }
+
+        /* 提示文字 */
+        .hint {
+            position: absolute;
+            bottom: 12%;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.85);
+            font-size: 1rem;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 50;
+            pointer-events: none;
+            padding: 0 20px;
+            line-height: 1.6;
+        }
+
+        /* 賀卡畫面 */
         #card-screen {
             position: absolute;
             top: 0;
@@ -92,94 +125,105 @@
             pointer-events: none;
             background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364);
             transition: opacity 2s ease;
-            padding: 40px;
-            box-sizing: border-box;
-            text-align: center;
+            padding: 40px 30px;
         }
 
         #message {
             color: #fff;
-            font-size: 1.3rem;
-            line-height: 1.8;
-            letter-spacing: 2px;
-            margin-bottom: 30px;
-            min-height: 100px;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            white-space: pre-wrap; 
+            font-size: 1.35rem;
+            line-height: 2;
+            letter-spacing: 1.5px;
+            margin-bottom: 40px;
+            text-align: center;
+            text-shadow: 0 2px 15px rgba(0,0,0,0.6);
+            max-width: 90%;
         }
 
         #signature {
-            width: 150px;
+            width: 180px;
             height: auto;
             opacity: 0;
             transition: opacity 2s ease;
+            margin-top: 20px;
         }
         
-        path {
+        #signature path {
             fill: none;
-            stroke: #d4af37;
-            stroke-width: 2;
+            stroke: #ffd700;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
             stroke-dasharray: 1000;
             stroke-dashoffset: 1000;
-            animation: sign 3s forwards;
-            animation-play-state: paused;
+            filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.5));
         }
         
-        @keyframes sign {
-            to { stroke-dashoffset: 0; }
+        #signature path.animate {
+            animation: sign 3s ease-out forwards;
+        }
+        
+        @keyframes sign { 
+            to { stroke-dashoffset: 0; } 
         }
 
-        .hint {
-            position: absolute;
-            bottom: 10%;
-            width: 100%;
-            text-align: center;
-            color: rgba(255,255,255,0.6);
-            font-size: 0.9rem;
-            opacity: 0;
-            transition: opacity 0.5s;
-            z-index: 60;
-            pointer-events: none;
-        }
-
+        /* 版本標籤 */
         #version-tag {
             position: absolute;
-            bottom: 5px;
-            right: 5px;
-            color: rgba(255,255,255,0.3);
+            bottom: 8px;
+            right: 8px;
+            color: rgba(255,255,255,0.25);
             font-size: 10px;
             z-index: 100;
             pointer-events: none;
+        }
+
+        /* 載入提示 */
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255,255,255,0.6);
+            font-size: 0.9rem;
+            z-index: 998;
         }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <div id="version-tag">Ver 8.0 (Synced)</div>
+    <div id="version-tag">Ver 13.0 Optimized</div>
 
-    <video id="timeline1" src="timeline1.mp4?v=8" playsinline webkit-playsinline loop muted preload="auto"></video>
-    
-    <video id="timeline2" src="timeline2.mp4?v=8" playsinline webkit-playsinline muted preload="auto"></video>
+    <!-- 影片層 -->
+    <video id="timeline1" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline2" playsinline webkit-playsinline muted preload="none"></video>
 
+    <!-- 開始畫面 -->
     <div id="start-screen">
-        <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
+        <button id="wish-btn">
+            按這裡許願
+            <span>許完願別忘了吹蠟燭 (大力吹)</span>
+        </button>
     </div>
 
+    <!-- 提示文字 -->
     <div id="blow-hint" class="hint"></div>
 
+    <!-- 賀卡畫面 -->
     <div id="card-screen">
-        <div id="message"></div> 
-        <svg id="signature" viewBox="0 0 300 100">
-            <path d="M40,80 Q50,10 60,80 Q70,40 80,60 L90,80 M95,60 L105,60 M110,80 L110,30 L120,80 M130,80 L130,30 L140,80 M150,60 Q160,50 170,60 T180,60 L190,60 Q200,50 190,70 T180,80" />
+        <div id="message"></div>
+        <svg id="signature" viewBox="0 0 320 120">
+            <path d="M50,90 Q60,20 70,90 Q80,50 90,70 L100,90 M105,70 L115,70 M120,90 L120,40 L130,90 M140,90 L140,40 L150,90 M160,70 Q170,60 180,70 T190,70 L200,70 Q210,60 200,80 T190,90" />
         </svg>
     </div>
 
-    <audio id="narration" src="narration.mp3" preload="auto"></audio>
-
+    <!-- 音訊 -->
+    <audio id="narration" preload="auto"></audio>
+    <audio id="bgm" preload="auto" loop></audio>
 </div>
 
 <script>
+    // ========== 全域變數 ==========
     const startScreen = document.getElementById('start-screen');
     const wishBtn = document.getElementById('wish-btn');
     const timeline1 = document.getElementById('timeline1');
@@ -189,212 +233,300 @@
     const signature = document.getElementById('signature');
     const signaturePath = signature.querySelector('path');
     const narration = document.getElementById('narration');
+    const bgm = document.getElementById('bgm');
     const blowHint = document.getElementById('blow-hint');
     
-    let audioContext, analyser, microphone;
+    let audioContext, analyser, microphone, micStream;
     let isBlowing = false;
+    let animationId = null;
 
-    // --- 腳本設定區 (已根據口白 narration.mp3 微調節奏) ---
-    const greetingSequence = [
-        // 00:00 "北鼻，" (語氣溫柔，稍慢)
-        { text: "北鼻，", speed: 250, pause: 500 }, 
-        
-        // 00:01 "生日快樂！" (語氣輕快，後面接長停頓等待下一句)
-        { text: "生日快樂！\n", speed: 150, pause: 1200 }, 
-        
-        // 00:03 "感謝地心引力，"
-        { text: "感謝地心引力，\n", speed: 180, pause: 400 },
-        
-        // 00:05 "讓妳在 12/12 走進我的生命。" (這句稍長，穩穩地打完)
-        { text: "讓妳在 12/12 走進我的生命。\n", speed: 160, pause: 1500 }, 
-        
-        // 00:10 "溫柔的妳，"
-        { text: "溫柔的妳，", speed: 200, pause: 400 },
-        
-        // 00:11 "總是讓我心疼、"
-        { text: "總是讓我心疼、", speed: 180, pause: 200 },
-        
-        // 00:13 "讓我瘋狂，" (後面有明顯換氣停頓)
-        { text: "讓我瘋狂，\n", speed: 180, pause: 1200 },
-        
-        // 00:15 "我會盡我全力，"
-        { text: "我會盡我全力，", speed: 180, pause: 300 },
-        
-        // 00:17 "保護這樣的妳。" (承諾的語氣，堅定)
-        { text: "保護這樣的妳。\n", speed: 180, pause: 1800 }, 
-        
-        // 00:20 "每天每天，" (語氣重複，節奏分明)
-        { text: "每天每天，", speed: 200, pause: 400 },
-        
-        // 00:22 "都在一直想著妳..." (這句拉比較長，很有感情)
-        { text: "都在一直想著妳...\n", speed: 220, pause: 1500 }, 
-        
-        // 00:25 "1/7 見面，" (語氣轉折，帶有期待)
-        { text: "1/7 見面，", speed: 160, pause: 500 },
-        
-        // 00:27 "我會把欠妳的寵愛，"
-        { text: "我會把欠妳的寵愛，\n", speed: 160, pause: 600 },
-        
-        // 00:29 "「親自」" (重音強調，這裡調得特別慢)
-        { text: "「親自」", speed: 350, pause: 500 }, 
-        
-        // 00:31 "送達。" (簡短有力)
-        { text: "送達。\n", speed: 150, pause: 1500 },
-        
-        // 00:33 "乖乖等我喔！" (結尾俏皮甜蜜)
-        { text: "乖乖等我喔！", speed: 150, pause: 0 }
-    ];
+    // ========== 賀詞腳本 ==========
+    const greetingText = `親愛的，生日快樂！
 
-    // --- 錯誤處理 ---
-    const handleError = (e, vName) => {
-        console.error(vName + " error:", e);
-    };
-    timeline1.addEventListener('error', (e) => handleError(e, 't1'));
-    timeline2.addEventListener('error', (e) => handleError(e, 't2'));
-    narration.addEventListener('error', (e) => handleError(e, 'audio'));
+感謝地心引力，
+讓妳在 12/12 走進我的生命。
 
-    // --- 1. 使用者點擊按鈕 ---
-    wishBtn.addEventListener('click', async () => {
-        startScreen.style.opacity = '0';
-        setTimeout(() => startScreen.style.display = 'none', 1000);
+溫柔的妳，
+總是讓我心疼、讓我瘋狂，
+我會盡我全力，保護這樣的妳。
 
-        // 預先解鎖
-        timeline2.play().then(() => {
-            timeline2.pause();
-            timeline2.currentTime = 0;
-        }).catch(e => console.log("Video unlock failed:", e));
+每天每天，都在一直想著妳...
 
-        narration.play().then(() => {
-            narration.pause();
-            narration.currentTime = 0;
-        }).catch(e => console.log("Audio unlock failed:", e));
+1/7 見面，
+我會把欠妳的寵愛，「親自」送達。
 
-        // 播放 Timeline 1
-        timeline1.classList.add('visible');
-        try {
-            await timeline1.play();
-        } catch (e) {
-            timeline1.muted = true;
-            timeline1.play();
-        }
+乖乖等我喔！`;
 
-        blowHint.innerHTML = "偵測麥克風中...請對著手機底部吹氣<br><span style='font-size:0.8em'>(若無法吹熄，請直接點擊畫面)</span>";
-        blowHint.style.opacity = '1';
-
-        setTimeout(() => {
-            document.addEventListener('click', manualBlowOut);
-            document.addEventListener('touchstart', manualBlowOut);
-        }, 1000);
-
-        try {
-            await initMicrophone();
-            detectBlow();
-        } catch (err) {
-            blowHint.innerHTML = "麥克風無法啟用<br>請直接點擊螢幕吹熄蠟燭";
-        }
+    // ========== 初始化 ==========
+    window.addEventListener('load', () => {
+        // 設定影片來源
+        timeline1.src = 'Timeline1.mp4?v=' + Date.now();
+        timeline2.src = 'Timeline2.mp4?v=' + Date.now();
+        narration.src = 'narration.mp3?v=' + Date.now();
+        bgm.src = 'cute.mp3?v=' + Date.now();
+        
+        // 錯誤處理
+        timeline1.onerror = () => console.warn('Timeline1 載入失敗');
+        timeline2.onerror = () => console.warn('Timeline2 載入失敗');
     });
 
-    function manualBlowOut() {
-        if (!isBlowing) {
-            triggerBlowOut();
-        }
+    // ========== 1. 點擊按鈕 ==========
+    wishBtn.addEventListener('click', startExperience, { once: true });
+
+    function startExperience() {
+        // 停止按鈕動畫
+        wishBtn.style.animation = 'none';
+        
+        // 隱藏開始畫面
+        startScreen.style.opacity = '0';
+        setTimeout(() => {
+            startScreen.style.display = 'none';
+        }, 1000);
+        
+        // 播放第一個影片
+        timeline1.classList.add('visible');
+        timeline1.play().catch(() => {
+            timeline1.muted = true;
+            timeline1.play();
+        });
+
+        // 延遲載入第二個影片
+        setTimeout(() => {
+            timeline2.load();
+        }, 800);
+
+        // 顯示提示
+        blowHint.innerHTML = "對著手機底部麥克風吹氣吹熄蠟燭<br><span style='font-size:0.9em;opacity:0.8'>(或直接點擊畫面)</span>";
+        blowHint.style.opacity = '1';
+
+        // 音訊解鎖
+        unlockAudio();
+
+        // 啟動麥克風偵測
+        setTimeout(initMicrophone, 1000);
+
+        // 備用：點擊觸發
+        setTimeout(() => {
+            document.addEventListener('click', manualBlow, { once: true });
+            document.addEventListener('touchstart', manualBlow, { once: true });
+        }, 1500);
     }
 
+    // ========== 音訊解鎖 ==========
+    function unlockAudio() {
+        [timeline2, narration, bgm].forEach(media => {
+            if (media) {
+                media.play().then(() => {
+                    media.pause();
+                    media.currentTime = 0;
+                }).catch(() => {});
+            }
+        });
+    }
+
+    // ========== 2. 麥克風偵測 ==========
     async function initMicrophone() {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        microphone = audioContext.createMediaStreamSource(stream);
-        microphone.connect(analyser);
-        analyser.fftSize = 256;
+        try {
+            micStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { 
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false 
+                }
+            });
+            
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            microphone = audioContext.createMediaStreamSource(micStream);
+            microphone.connect(analyser);
+            analyser.fftSize = 512;
+            analyser.smoothingTimeConstant = 0.3;
+            
+            detectBlow();
+            
+        } catch (err) {
+            console.warn('麥克風啟用失敗:', err);
+            blowHint.innerHTML = "請直接點擊畫面吹熄蠟燭";
+        }
     }
 
     function detectBlow() {
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
+        let blowCount = 0;
         
         function checkAudio() {
-            if (isBlowing) return;
+            if (isBlowing) {
+                cancelAnimationFrame(animationId);
+                return;
+            }
+            
             analyser.getByteFrequencyData(dataArray);
             
-            let sum = 0;
-            for(let i = 0; i < bufferLength; i++) sum += dataArray[i];
-            let average = sum / bufferLength;
-
-            if (average > 45) { 
-                triggerBlowOut();
-            } else {
-                requestAnimationFrame(checkAudio);
+            // 計算低頻能量（吹氣主要在低頻）
+            let lowFreqSum = 0;
+            for (let i = 0; i < bufferLength * 0.2; i++) {
+                lowFreqSum += dataArray[i];
             }
+            let average = lowFreqSum / (bufferLength * 0.2);
+
+            // 偵測閾值
+            if (average > 50) {
+                blowCount++;
+                if (blowCount > 3) { // 連續偵測到3次
+                    triggerBlowOut();
+                    return;
+                }
+            } else {
+                blowCount = Math.max(0, blowCount - 1);
+            }
+            
+            animationId = requestAnimationFrame(checkAudio);
         }
-        checkAudio();
+        
+        animationId = requestAnimationFrame(checkAudio);
     }
 
-    // --- 切換邏輯 ---
+    function manualBlow() {
+        if (!isBlowing) triggerBlowOut();
+    }
+
+    // ========== 3. 切換到吹熄影片 ==========
     function triggerBlowOut() {
-        if(isBlowing) return;
+        if (isBlowing) return;
         isBlowing = true;
         
-        document.removeEventListener('click', manualBlowOut);
-        document.removeEventListener('touchstart', manualBlowOut);
+        // 清理資源
+        cleanupMicrophone();
+        
+        // 移除提示
         blowHint.style.opacity = '0';
 
-        timeline2.style.zIndex = "100"; 
+        // 切換影片
+        timeline2.style.zIndex = '100';
+        timeline2.classList.add('visible');
         
         timeline2.play().then(() => {
-            timeline2.classList.add('visible');
             setTimeout(() => {
                 timeline1.classList.remove('visible');
                 timeline1.pause();
-            }, 100);
-        }).catch(error => {
-            alert("播放失敗: " + error.message);
+            }, 300);
+        }).catch(err => {
+            console.error('Timeline2 播放失敗:', err);
         });
 
+        // 影片結束後顯示賀卡
         timeline2.onended = () => {
-            showCard();
+            setTimeout(showCard, 500);
         };
     }
 
-    // --- 顯示賀卡 ---
-    function showCard() {
-        timeline2.style.opacity = '0';
-        cardScreen.style.opacity = '1';
-        
-        narration.play().catch(e => console.log("Audio still restricted:", e));
-        
-        playSequence(0);
+    function cleanupMicrophone() {
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
+        if (micStream) {
+            micStream.getTracks().forEach(track => track.stop());
+            micStream = null;
+        }
+        if (microphone) {
+            microphone.disconnect();
+            microphone = null;
+        }
+        if (audioContext && audioContext.state !== 'closed') {
+            audioContext.close();
+            audioContext = null;
+        }
     }
 
-    // 處理每一段的播放
-    function playSequence(index) {
-        if (index >= greetingSequence.length) {
+    // ========== 4. 顯示賀卡 ==========
+    function showCard() {
+        // 淡出影片
+        timeline2.style.opacity = '0';
+        
+        // 顯示賀卡
+        cardScreen.style.opacity = '1';
+        cardScreen.style.pointerEvents = 'auto';
+
+        // 播放背景音樂
+        if (bgm) {
+            bgm.volume = 0.25;
+            bgm.play().catch(() => {});
+        }
+
+        // 播放口白
+        if (narration) {
+            narration.volume = 1.0;
+            narration.play().catch(() => {});
+            
+            narration.onended = () => {
+                if (bgm) fadeBgmVolume(0.25, 0.8, 3000);
+            };
+        }
+
+        // 打字機效果
+        setTimeout(() => {
+            typeWriter(greetingText, 0);
+        }, 800);
+    }
+
+    // ========== 打字機效果（優化版） ==========
+    function typeWriter(text, index) {
+        if (index >= text.length) {
             showSignature();
             return;
         }
 
-        const segment = greetingSequence[index];
-        typeWriterSegment(segment.text, 0, segment.speed, () => {
-            setTimeout(() => {
-                playSequence(index + 1);
-            }, segment.pause || 0);
-        });
-    }
-
-    // 單一段落的打字機
-    function typeWriterSegment(text, i, speed, onComplete) {
-        if (i < text.length) {
-            messageEl.innerHTML += (text.charAt(i) === '\n') ? '<br>' : text.charAt(i);
-            setTimeout(() => typeWriterSegment(text, i + 1, speed, onComplete), speed);
+        const char = text.charAt(index);
+        
+        if (char === '\n') {
+            messageEl.appendChild(document.createElement('br'));
         } else {
-            if (onComplete) onComplete();
+            messageEl.appendChild(document.createTextNode(char));
         }
+
+        // 根據標點符號調整速度
+        let delay = 80;
+        if (char === '，' || char === '。' || char === '！' || char === '？') {
+            delay = 400;
+        } else if (char === '\n') {
+            delay = 600;
+        }
+
+        setTimeout(() => typeWriter(text, index + 1), delay);
     }
 
+    // ========== 顯示簽名 ==========
     function showSignature() {
-        signature.style.opacity = '1';
-        signaturePath.style.animationPlayState = 'running';
+        setTimeout(() => {
+            signature.style.opacity = '1';
+            signaturePath.classList.add('animate');
+        }, 1000);
     }
+
+    // ========== 音量淡入淡出 ==========
+    function fadeBgmVolume(from, to, duration) {
+        const steps = 50;
+        const stepDuration = duration / steps;
+        const increment = (to - from) / steps;
+        let current = from;
+        let step = 0;
+
+        const fadeInterval = setInterval(() => {
+            if (step >= steps) {
+                clearInterval(fadeInterval);
+                bgm.volume = to;
+                return;
+            }
+            current += increment;
+            bgm.volume = Math.max(0, Math.min(1, current));
+            step++;
+        }, stepDuration);
+    }
+
+    // ========== 防止意外離開 ==========
+    window.addEventListener('beforeunload', cleanupMicrophone);
 </script>
 
 </body>
