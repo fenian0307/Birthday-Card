@@ -19,14 +19,13 @@
             align-items: center;
         }
 
-        /* 容器與層級管理 */
         #container {
             position: relative;
             width: 100%;
             height: 100%;
         }
 
-        /* 影片層 - 預設隱藏 */
+        /* 影片層 */
         video {
             position: absolute;
             top: 50%;
@@ -40,7 +39,6 @@
             z-index: 10;
         }
 
-        /* 顯示狀態 */
         video.active {
             opacity: 1;
         }
@@ -56,7 +54,7 @@
             justify-content: center;
             align-items: center;
             z-index: 20;
-            background: #000; /* 初始全黑背景 */
+            background: #000;
             transition: opacity 1s ease;
         }
 
@@ -71,6 +69,7 @@
             backdrop-filter: blur(10px);
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
             animation: pulse 2s infinite;
+            -webkit-tap-highlight-color: transparent; /* 移除點擊高亮 */
         }
 
         @keyframes pulse {
@@ -93,14 +92,13 @@
             z-index: 30;
             opacity: 0;
             pointer-events: none;
-            background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364); /* 深色質感背景 */
+            background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364);
             transition: opacity 2s ease;
             padding: 40px;
             box-sizing: border-box;
             text-align: center;
         }
 
-        /* 逐字顯示的文字 */
         #message {
             color: #fff;
             font-size: 1.5rem;
@@ -111,7 +109,6 @@
             text-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
 
-        /* 簽名樣式 (SVG) */
         #signature {
             width: 150px;
             height: auto;
@@ -121,7 +118,7 @@
         
         path {
             fill: none;
-            stroke: #d4af37; /* 金色簽名 */
+            stroke: #d4af37;
             stroke-width: 2;
             stroke-dasharray: 1000;
             stroke-dashoffset: 1000;
@@ -133,14 +130,17 @@
             to { stroke-dashoffset: 0; }
         }
 
-        /* 輔助提示文字 */
         .hint {
             position: absolute;
             bottom: 10%;
-            color: rgba(255,255,255,0.5);
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.6);
             font-size: 0.9rem;
             opacity: 0;
             transition: opacity 0.5s;
+            z-index: 25;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -148,18 +148,18 @@
 
 <div id="container">
     
-    <video id="timeline1" src="Timeline1.mov" playsinline loop muted preload="auto"></video>
-    
-    <video id="timeline2" src="Timeline2.mov" playsinline preload="auto"></video>
+    <video id="timeline1" src="timeline1.mov" playsinline loop muted preload="auto"></video>
+    <video id="timeline2" src="timeline2.mov" playsinline preload="auto"></video>
 
     <div id="start-screen">
         <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
     </div>
 
-    <div id="blow-hint" class="hint">偵測麥克風中...請對著手機底部吹氣</div>
+    <div id="blow-hint" class="hint">偵測麥克風中...請對著手機底部吹氣<br>(或點擊螢幕吹熄)</div>
 
     <div id="card-screen">
-        <div id="message"></div> <svg id="signature" viewBox="0 0 300 100">
+        <div id="message"></div> 
+        <svg id="signature" viewBox="0 0 300 100">
             <path d="M40,80 Q50,10 60,80 Q70,40 80,60 L90,80 M95,60 L105,60 M110,80 L110,30 L120,80 M130,80 L130,30 L140,80 M150,60 Q160,50 170,60 T180,60 L190,60 Q200,50 190,70 T180,80" />
         </svg>
     </div>
@@ -169,7 +169,6 @@
 </div>
 
 <script>
-    // 變數設定
     const startScreen = document.getElementById('start-screen');
     const wishBtn = document.getElementById('wish-btn');
     const timeline1 = document.getElementById('timeline1');
@@ -181,42 +180,60 @@
     const narration = document.getElementById('narration');
     const blowHint = document.getElementById('blow-hint');
 
-    // 賀詞內容 (請在此修改)
     const greetingText = "願你的每一個願望都能成真\n新的一年，平安喜樂\n生日快樂";
-    const textSpeed = 100; // 文字出現速度 (毫秒)
+    const textSpeed = 100;
 
     let audioContext;
     let analyser;
     let microphone;
     let isBlowing = false;
 
-    // --- 步驟 1: 點擊按鈕 ---
+    // --- 核心邏輯修正 ---
     wishBtn.addEventListener('click', async () => {
-        // 1. 初始化 AudioContext (必須在點擊事件中)
+        // 1. 介面切換 (立刻隱藏按鈕)
+        startScreen.style.opacity = '0';
+        setTimeout(() => { startScreen.style.display = 'none'; }, 1000);
+
+        // 2. 影片播放 (最優先執行)
+        timeline1.classList.add('active');
+        
+        // 嘗試播放影片 (處理 iOS 自動播放限制)
+        try {
+            await timeline1.play();
+        } catch (e) {
+            console.warn("自動播放受阻，嘗試靜音播放", e);
+            timeline1.muted = true;
+            timeline1.play();
+        }
+
+        // 3. 顯示提示
+        blowHint.style.opacity = '1';
+
+        // 4. 啟用備用方案 (點擊螢幕也可吹熄)
+        // 延遲一點點再加入監聽，避免按鈕的點擊穿透
+        setTimeout(() => {
+            document.addEventListener('click', manualBlowOut);
+            document.addEventListener('touchstart', manualBlowOut);
+        }, 500);
+
+        // 5. 嘗試啟用麥克風 (最後執行，以免卡住影片)
         try {
             await initMicrophone();
-            
-            // 2. 介面轉換
-            startScreen.style.opacity = '0';
-            setTimeout(() => { startScreen.style.display = 'none'; }, 1000);
-
-            // 3. 播放蠟燭影片 (Timeline1)
-            timeline1.classList.add('active');
-            timeline1.play();
-            
-            // 顯示吹氣提示
-            blowHint.style.opacity = '1';
-
-            // 開始監聽吹氣
             detectBlow();
-
         } catch (err) {
-            alert("需要麥克風權限才能吹蠟燭喔！請允許存取。");
-            console.error(err);
+            console.log("麥克風無法存取，將依賴點擊觸發", err);
+            blowHint.innerHTML = "麥克風無法使用<br>請點擊螢幕來吹熄蠟燭";
         }
     });
 
-    // --- 麥克風與吹氣偵測邏輯 ---
+    // --- 備用：手動點擊吹熄 ---
+    function manualBlowOut() {
+        if (!isBlowing) {
+            triggerBlowOut();
+        }
+    }
+
+    // --- 麥克風設定 ---
     async function initMicrophone() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -226,24 +243,23 @@
         analyser.fftSize = 256;
     }
 
+    // --- 吹氣偵測 ---
     function detectBlow() {
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
         
         function checkAudio() {
-            if (isBlowing) return; // 已觸發則停止
+            if (isBlowing) return;
 
             analyser.getByteFrequencyData(dataArray);
             
-            // 計算音量平均值
             let sum = 0;
             for(let i = 0; i < bufferLength; i++) {
                 sum += dataArray[i];
             }
             let average = sum / bufferLength;
 
-            // 判斷是否為吹氣 (音量閾值，可依需求調整，通常 40-50 左右)
-            // 吹氣會產生大量低頻噪音
+            // 閾值：數值越低越靈敏 (0-255)
             if (average > 45) { 
                 triggerBlowOut();
             } else {
@@ -253,54 +269,53 @@
         checkAudio();
     }
 
-    // --- 步驟 2: 觸發吹熄 ---
+    // --- 吹熄觸發 ---
     function triggerBlowOut() {
+        if(isBlowing) return; // 避免重複觸發
         isBlowing = true;
+        
+        // 移除備用監聽
+        document.removeEventListener('click', manualBlowOut);
+        document.removeEventListener('touchstart', manualBlowOut);
+
         blowHint.style.opacity = '0';
 
-        // 切換影片
-        timeline1.style.opacity = '0'; // 淡出 loop
-        timeline2.classList.add('active'); // 顯示 blow
+        // 切換影片：無縫銜接
+        // 先讓 timeline2 準備好並播放
+        timeline2.classList.add('active');
         timeline2.play();
+        
+        // 然後隱藏 timeline1
+        timeline1.style.opacity = '0';
+        timeline1.pause();
 
-        // 監聽影片結束
         timeline2.onended = () => {
             showCard();
         };
     }
 
-    // --- 步驟 3: 顯示賀卡與口白 ---
+    // --- 顯示賀卡 ---
     function showCard() {
-        // 淡出影片
         timeline2.style.opacity = '0';
-        
-        // 淡入賀卡
         cardScreen.style.opacity = '1';
         
-        // 播放口白
-        narration.play();
+        // 確保音效播放
+        narration.play().catch(e => console.log("音效自動播放需互動", e));
         
-        // 開始打字機效果
         typeWriter(greetingText, 0);
     }
 
-    // --- 打字機效果 ---
     function typeWriter(text, i) {
         if (i < text.length) {
-            // 處理換行
             if (text.charAt(i) === '\n') {
                 messageEl.innerHTML += '<br>';
             } else {
                 messageEl.innerHTML += text.charAt(i);
             }
-            
-            // 根據口白長度，這裡可能需要動態調整速度
-            // 如果希望嚴格對齊，需要更複雜的時間軸陣列，目前使用固定速度
             setTimeout(() => {
                 typeWriter(text, i + 1);
             }, textSpeed);
         } else {
-            // 文字打完後，顯示簽名
             showSignature();
         }
     }
@@ -309,7 +324,6 @@
         signature.style.opacity = '1';
         signaturePath.style.animationPlayState = 'running';
     }
-
 </script>
 
 </body>
