@@ -158,3 +158,223 @@
             top: 10px;
             left: 10px;
             color: lime;
+            font-size: 12px;
+            background: rgba(0,0,0,0.5);
+            padding: 5px;
+            z-index: 100;
+            pointer-events: none;
+            font-family: monospace;
+            display: none; /* 預設隱藏，若要開啟請改 block */
+        }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="debug-log">Ready...</div>
+
+    <video id="timeline1" src="timeline1.mov" playsinline webkit-playsinline loop muted preload="auto"></video>
+    
+    <video id="timeline2" src="timeline2.mov" playsinline webkit-playsinline muted preload="auto"></video>
+
+    <div id="start-screen">
+        <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
+    </div>
+
+    <div id="blow-hint" class="hint">偵測麥克風中...請對著手機底部吹氣<br>(若無法吹熄，請點擊畫面)</div>
+
+    <div id="card-screen">
+        <div id="message"></div> 
+        <svg id="signature" viewBox="0 0 300 100">
+            <path d="M40,80 Q50,10 60,80 Q70,40 80,60 L90,80 M95,60 L105,60 M110,80 L110,30 L120,80 M130,80 L130,30 L140,80 M150,60 Q160,50 170,60 T180,60 L190,60 Q200,50 190,70 T180,80" />
+        </svg>
+    </div>
+
+    <audio id="narration" src="narration.mp3" preload="auto"></audio>
+
+</div>
+
+<script>
+    // DOM 元素
+    const debugLog = document.getElementById('debug-log');
+    const startScreen = document.getElementById('start-screen');
+    const wishBtn = document.getElementById('wish-btn');
+    const timeline1 = document.getElementById('timeline1');
+    const timeline2 = document.getElementById('timeline2');
+    const cardScreen = document.getElementById('card-screen');
+    const messageEl = document.getElementById('message');
+    const signature = document.getElementById('signature');
+    const signaturePath = signature.querySelector('path');
+    const narration = document.getElementById('narration');
+    const blowHint = document.getElementById('blow-hint');
+
+    // 設定
+    const greetingText = "願你的每一個願望都能成真\n新的一年，平安喜樂\n生日快樂";
+    const textSpeed = 100;
+    
+    let audioContext, analyser, microphone;
+    let isBlowing = false;
+
+    // 簡單的 Log 工具
+    function log(msg) {
+        debugLog.style.display = 'block'; // 發生動作時顯示
+        debugLog.innerHTML = msg;
+        console.log(msg);
+    }
+
+    // 監聽影片錯誤
+    timeline2.addEventListener('error', (e) => {
+        alert("錯誤：無法載入 timeline2.mov，請確認檔案已上傳至 GitHub");
+        log("Error loading Timeline2");
+    });
+
+    // --- 1. 使用者點擊按鈕 ---
+    wishBtn.addEventListener('click', async () => {
+        log("Button Clicked");
+        
+        // 介面轉換
+        startScreen.style.opacity = '0';
+        setTimeout(() => startScreen.style.display = 'none', 1000);
+
+        // 預先載入 Timeline 2 (關鍵)
+        timeline2.load();
+        
+        // 播放 Timeline 1
+        timeline1.classList.add('visible');
+        try {
+            await timeline1.play();
+            log("Timeline 1 Playing");
+        } catch (e) {
+            log("Autoplay blocked, muting...");
+            timeline1.muted = true;
+            timeline1.play();
+        }
+
+        // 顯示提示
+        blowHint.style.opacity = '1';
+
+        // 延遲啟用備用點擊方案 (避免誤觸)
+        setTimeout(() => {
+            document.addEventListener('click', manualBlowOut);
+            document.addEventListener('touchstart', manualBlowOut);
+        }, 1000);
+
+        // 啟動麥克風
+        try {
+            await initMicrophone();
+            detectBlow();
+            log("Mic Listening...");
+        } catch (err) {
+            log("Mic Failed: " + err);
+            blowHint.innerHTML = "麥克風無法啟用<br>請直接點擊螢幕吹熄蠟燭";
+        }
+    });
+
+    // --- 2. 備用：手動點擊觸發 ---
+    function manualBlowOut() {
+        if (!isBlowing) {
+            log("Manual Touch Detected");
+            triggerBlowOut();
+        }
+    }
+
+    // --- 3. 麥克風設定 ---
+    async function initMicrophone() {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+        analyser.fftSize = 256;
+    }
+
+    // --- 4. 偵測吹氣 ---
+    function detectBlow() {
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        function checkAudio() {
+            if (isBlowing) return;
+            analyser.getByteFrequencyData(dataArray);
+            
+            let sum = 0;
+            for(let i = 0; i < bufferLength; i++) sum += dataArray[i];
+            let average = sum / bufferLength;
+
+            // 顯示音量數值以便測試 (可選)
+            // log("Vol: " + Math.floor(average)); 
+
+            if (average > 45) { 
+                log("Blow Detected! (Avg: " + Math.floor(average) + ")");
+                triggerBlowOut();
+            } else {
+                requestAnimationFrame(checkAudio);
+            }
+        }
+        checkAudio();
+    }
+
+    // --- 5. 觸發切換 (核心修改處) ---
+    function triggerBlowOut() {
+        if(isBlowing) return;
+        isBlowing = true;
+        
+        // 移除監聽
+        document.removeEventListener('click', manualBlowOut);
+        document.removeEventListener('touchstart', manualBlowOut);
+        blowHint.style.opacity = '0';
+
+        log("Switching Videos...");
+
+        // 步驟 A: 強制把 Timeline 2 的層級拉到最高
+        timeline2.style.zIndex = "100"; 
+        
+        // 步驟 B: 播放 Timeline 2
+        timeline2.play().then(() => {
+            log("Timeline 2 Started");
+            
+            // 步驟 C: 影片2開始播之後，才讓它顯示，並隱藏影片1
+            timeline2.classList.add('visible');
+            timeline1.classList.remove('visible');
+            
+            // 稍微延遲一點點再暫停影片1，確保無縫
+            setTimeout(() => timeline1.pause(), 200);
+
+        }).catch(e => {
+            log("Timeline 2 Play Fail: " + e);
+            alert("影片2播放失敗，請檢查網路或檔案");
+        });
+
+        // 步驟 D: 監聽結束
+        timeline2.onended = () => {
+            log("Timeline 2 Ended");
+            showCard();
+        };
+    }
+
+    // --- 6. 顯示賀卡 ---
+    function showCard() {
+        timeline2.style.opacity = '0';
+        cardScreen.style.opacity = '1';
+        
+        narration.play().catch(e => log("Audio Autoplay Fail"));
+        typeWriter(greetingText, 0);
+    }
+
+    function typeWriter(text, i) {
+        if (i < text.length) {
+            messageEl.innerHTML += (text.charAt(i) === '\n') ? '<br>' : text.charAt(i);
+            setTimeout(() => typeWriter(text, i + 1), textSpeed);
+        } else {
+            showSignature();
+        }
+    }
+
+    function showSignature() {
+        signature.style.opacity = '1';
+        signaturePath.style.animationPlayState = 'running';
+    }
+</script>
+
+</body>
+</html>
