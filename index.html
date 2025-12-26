@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動蠟燭</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000; /* 背景黑屏，防止影片加載前的閃爍 */
+        }
+
+        #candle-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            cursor: pointer; /* 提示使用者可以點擊 */
+        }
+
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.5s ease; /* 增加淡入淡出感 */
+        }
+
+        /* 初始狀態：燃燒影片在上 */
+        #burningVideo {
+            z-index: 2;
+            opacity: 1;
+        }
+
+        /* 熄滅影片在下 */
+        #extinguishVideo {
+            z-index: 1;
+            opacity: 0;
+        }
+
+        /* 熄滅後的狀態控制 */
+        .is-extinguished #burningVideo {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .is-extinguished #extinguishVideo {
+            z-index: 3;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+<div id="candle-container">
+    <video id="burningVideo" loop muted playsinline autoplay>
+        <source src="burning.mp4" type="video/mp4">
+        您的瀏覽器不支援影片標籤。
+    </video>
+
+    <video id="extinguishVideo" muted playsinline>
+        <source src="extinguish.mp4" type="video/mp4">
+    </video>
+</div>
+
+<script>
+    const container = document.getElementById('candle-container');
+    const burning = document.getElementById('burningVideo');
+    const extinguish = document.getElementById('extinguishVideo');
+
+    let isBlownOut = false;
+
+    container.addEventListener('click', () => {
+        if (isBlownOut) return; // 防止重複點擊
+
+        isBlownOut = true;
+        
+        // 1. 切換 CSS 類別來控制透明度與層級
+        container.classList.add('is-extinguished');
+
+        // 2. 停止燃燒影片（節省效能）並播放熄滅影片
+        burning.pause();
+        extinguish.play();
+
+        // 3. 監聽熄滅影片結束後的動作（選用）
+        extinguish.onended = () => {
+            console.log("蠟燭已熄滅，儀式感達成。");
+            // 如果你想在一段時間後重置，可以在這裡寫邏輯
+        };
+    });
+
+    // 處理行動裝置自動播放限制
+    document.body.addEventListener('touchstart', () => {
+        burning.play();
+    }, { once: true });
+</script>
+
+</body>
+</html>
