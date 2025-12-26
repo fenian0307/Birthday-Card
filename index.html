@@ -99,12 +99,13 @@
 
         #message {
             color: #fff;
-            font-size: 1.5rem;
-            line-height: 2;
+            font-size: 1.3rem; /* 字體稍微調小一點以容納較多文字 */
+            line-height: 1.8;
             letter-spacing: 2px;
-            margin-bottom: 50px;
+            margin-bottom: 30px;
             min-height: 100px;
             text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            white-space: pre-wrap; /* 保留換行格式 */
         }
 
         #signature {
@@ -155,11 +156,11 @@
 <body>
 
 <div id="container">
-    <div id="version-tag">Ver 5.0 (Audio Fix)</div>
+    <div id="version-tag">Ver 6.0 (Final Text)</div>
 
-    <video id="timeline1" src="timeline1.mp4?v=5" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline1" src="timeline1.mp4?v=6" playsinline webkit-playsinline loop muted preload="auto"></video>
     
-    <video id="timeline2" src="timeline2.mp4?v=5" playsinline webkit-playsinline muted preload="auto"></video>
+    <video id="timeline2" src="timeline2.mp4?v=6" playsinline webkit-playsinline muted preload="auto"></video>
 
     <div id="start-screen">
         <button id="wish-btn">按這裡許願<br><span style="font-size:0.8em; opacity:0.8;">許完願別忘了吹蠟燭 (大力吹)</span></button>
@@ -190,13 +191,15 @@
     const narration = document.getElementById('narration');
     const blowHint = document.getElementById('blow-hint');
 
-    // 賀詞
-    const greetingText = "願你的每一個願望都能成真\n新的一年，平安喜樂\n生日快樂";
+    // 直接使用您指定的文字
+    const greetingText = "北鼻，生日快樂！\n感謝地心引力，\n讓妳在 12/12 走進我的生命。\n溫柔的妳，總是讓我心疼、讓我瘋狂，\n我會盡我全力，保護這樣的妳。\n每天每天，都在一直想著妳...\n1/7 見面，我會把欠妳的寵愛，\n「親自」送達。\n乖乖等我喔！";
+    
+    // 設定文字速度 (毫秒/字)，150 比較深情
+    const textSpeed = 150;
     
     let audioContext, analyser, microphone;
     let isBlowing = false;
 
-    // --- 錯誤處理 ---
     const handleError = (e, vName) => {
         console.error(vName + " error:", e);
     };
@@ -204,26 +207,23 @@
     timeline2.addEventListener('error', (e) => handleError(e, 't2'));
     narration.addEventListener('error', (e) => handleError(e, 'audio'));
 
-    // --- 1. 使用者點擊按鈕 (關鍵修正：同時解鎖影片與聲音) ---
+    // --- 1. 使用者點擊按鈕 ---
     wishBtn.addEventListener('click', async () => {
-        // 介面轉換
         startScreen.style.opacity = '0';
         setTimeout(() => startScreen.style.display = 'none', 1000);
 
-        // A. 預先解鎖 Timeline2 影片
+        // 預先解鎖影片與聲音
         timeline2.play().then(() => {
             timeline2.pause();
             timeline2.currentTime = 0;
         }).catch(e => console.log("Video unlock failed:", e));
 
-        // B. 【關鍵修正】預先解鎖 Narration 音效
-        // 這一步至關重要，否則後面吹完蠟燭聲音會出不來
         narration.play().then(() => {
             narration.pause();
             narration.currentTime = 0;
         }).catch(e => console.log("Audio unlock failed:", e));
 
-        // C. 播放 Timeline 1 (蠟燭)
+        // 播放 Timeline 1
         timeline1.classList.add('visible');
         try {
             await timeline1.play();
@@ -232,17 +232,14 @@
             timeline1.play();
         }
 
-        // D. 顯示提示
         blowHint.innerHTML = "偵測麥克風中...請對著手機底部吹氣<br><span style='font-size:0.8em'>(若無法吹熄，請直接點擊畫面)</span>";
         blowHint.style.opacity = '1';
 
-        // E. 備用點擊方案
         setTimeout(() => {
             document.addEventListener('click', manualBlowOut);
             document.addEventListener('touchstart', manualBlowOut);
         }, 1000);
 
-        // F. 啟動麥克風
         try {
             await initMicrophone();
             detectBlow();
@@ -251,14 +248,12 @@
         }
     });
 
-    // --- 2. 備用：手動點擊觸發 ---
     function manualBlowOut() {
         if (!isBlowing) {
             triggerBlowOut();
         }
     }
 
-    // --- 3. 麥克風設定 ---
     async function initMicrophone() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -268,7 +263,6 @@
         analyser.fftSize = 256;
     }
 
-    // --- 4. 偵測吹氣 ---
     function detectBlow() {
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
@@ -316,44 +310,22 @@
         };
     }
 
-    // --- 6. 顯示賀卡 (含音效同步計算) ---
+    // --- 6. 顯示賀卡 ---
     function showCard() {
         timeline2.style.opacity = '0';
         cardScreen.style.opacity = '1';
         
-        // 播放音效
-        var audioPromise = narration.play();
+        // 嘗試播放音效 (如果前面有解鎖成功，這裡應該會有聲音)
+        narration.play().catch(e => console.log("Audio still restricted:", e));
         
-        if (audioPromise !== undefined) {
-            audioPromise.then(_ => {
-                // 音效成功播放，開始計算打字速度
-                // 計算公式：音效總長度 / 文字總字數 = 每個字的間隔時間
-                let audioDuration = narration.duration; 
-                
-                // 如果讀不到長度(NaN)，預設 5 秒
-                if(isNaN(audioDuration)) audioDuration = 5; 
-                
-                // 換算成毫秒，稍微扣除一點緩衝時間確保字在聲音結束前打完
-                let totalTimeMs = audioDuration * 1000;
-                let charCount = greetingText.length;
-                let calculatedSpeed = totalTimeMs / charCount;
-
-                typeWriter(greetingText, 0, calculatedSpeed);
-
-            }).catch(error => {
-                console.log("Audio play failed:", error);
-                // 如果音效還是播不出來，就用預設速度打字
-                typeWriter(greetingText, 0, 150);
-            });
-        } else {
-            typeWriter(greetingText, 0, 150);
-        }
+        // 開始打字 (不再依賴音效長度，直接用固定速度)
+        typeWriter(greetingText, 0);
     }
 
-    function typeWriter(text, i, speed) {
+    function typeWriter(text, i) {
         if (i < text.length) {
             messageEl.innerHTML += (text.charAt(i) === '\n') ? '<br>' : text.charAt(i);
-            setTimeout(() => typeWriter(text, i + 1, speed), speed);
+            setTimeout(() => typeWriter(text, i + 1), textSpeed);
         } else {
             showSignature();
         }
