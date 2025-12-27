@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>生日快樂 🎂</title>
+    
+    <!-- 預載關鍵資源 -->
+    <link rel="preload" as="video" href="timeline1.mp4">
+    <link rel="preload" as="audio" href="happyBD.mp3">
+    
+    <style>
+        :root {
+            --primary-gold: #ffd700;
+            --transition-fast: 0.5s;
+            --transition-slow: 2s;
+            --transition-fade: 5s;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+        }
+
+        /* 影片層 */
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+            will-change: opacity;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+        }
+
+        #timeline1 { 
+            z-index: 10; 
+            opacity: 0; 
+            transition: opacity var(--transition-fade) ease-in;
+        }
+
+        #timeline2 { 
+            z-index: 20; 
+            opacity: 0;
+            transition: opacity var(--transition-fast) ease;
+        }
+
+        video.visible { opacity: 1 !important; }
+
+        /* 開始畫面 */
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            background-color: #000;
+            transition: opacity 1s ease;
+        }
+
+        #wish-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            color: #fff;
+            padding: 25px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            cursor: pointer;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            animation: pulse 2s infinite;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            line-height: 1.6;
+            text-align: center;
+            max-width: 90%;
+            transition: opacity 0.3s, transform 0.2s;
+        }
+
+        #wish-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            animation: none;
+        }
+
+        #wish-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        @keyframes pulse {
+            0%, 100% { 
+                transform: scale(1) translateZ(0); 
+                box-shadow: 0 8px 32px rgba(255, 215, 0, 0.3); 
+            }
+            50% { 
+                transform: scale(1.05) translateZ(0); 
+                box-shadow: 0 12px 48px rgba(255, 215, 0, 0.6); 
+            }
+        }
+
+        #wish-btn span {
+            display: block;
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-top: 8px;
+            color: var(--primary-gold);
+        }
+
+        /* 載入進度 */
+        #loading-progress {
+            margin-top: 30px;
+            color: rgba(255,255,255,0.7);
+            font-size: 0.95rem;
+            text-align: center;
+            transition: opacity 0.5s;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.2);
+            border-top-color: var(--primary-gold);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 15px auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #progress-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            margin: 15px auto;
+            overflow: hidden;
+        }
+
+        #progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-gold), #fff);
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--primary-gold);
+        }
+
+        /* 提示文字 */
+        .hint {
+            position: absolute;
+            bottom: 15%;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.85);
+            font-size: 1rem;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+            z-index: 50;
+            pointer-events: none;
+            padding: 0 20px;
+            line-height: 1.6;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        /* 賀卡畫面 */
+        #card-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 40;
+            opacity: 0;
+            pointer-events: none;
+            background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364);
+            transition: opacity var(--transition-slow) ease;
+            padding: 40px 30px;
+        }
+
+        #message {
+            color: #fff;
+            font-size: 1.35rem;
+            line-height: 2;
+            letter-spacing: 1.5px;
+            margin-bottom: 40px;
+            text-align: center;
+            text-shadow: 0 2px 15px rgba(0,0,0,0.6);
+            max-width: 90%;
+        }
+
+        #signature {
+            width: 180px;
+            height: auto;
+            opacity: 0;
+            transition: opacity var(--transition-slow) ease;
+            margin-top: 20px;
+        }
+        
+        #signature path {
+            fill: none;
+            stroke: var(--primary-gold);
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.5));
+        }
+        
+        #signature path.animate {
+            animation: sign 3s ease-out forwards;
+        }
+        
+        @keyframes sign { 
+            to { stroke-dashoffset: 0; } 
+        }
+
+        /* 錯誤提示 */
+        .error-message {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 50, 50, 0.9);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            max-width: 90%;
+            text-align: center;
+        }
+
+        #version-tag {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            color: rgba(255,255,255,0.25);
+            font-size: 10px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        /* 響應式調整 */
+        @media (max-width: 480px) {
+            #wish-btn {
+                font-size: 1.1rem;
+                padding: 20px 25px;
+            }
+            
+            #message {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="version-tag">Ver 17.0 (Optimized)</div>
+
+    <video id="timeline1" src="timeline1.mp4" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline2" src="timeline2.mp4" playsinline webkit-playsinline muted preload="auto"></video>
+
+    <div id="start-screen">
+        <button id="wish-btn" disabled>
+            許願
+            <span>許完願望要記得吹蠟燭哦<br>（可能要吹大力一點XD）</span>
+        </button>
+        <div id="loading-progress">
+            <div class="loading-spinner"></div>
+            <div>載入中... <span id="progress-percent">0</span>%</div>
+            <div id="progress-bar">
+                <div id="progress-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="blow-hint" class="hint"></div>
+
+    <div id="card-screen">
+        <div id="message"></div>
+        <svg id="signature" viewBox="0 0 320 120">
+            <path d="M50,90 Q60,20 70,90 Q80,50 90,70 L100,90 M105,70 L115,70 M120,90 L120,40 L130,90 M140,90 L140,40 L150,90 M160,70 Q170,60 180,70 T190,70 L200,70 Q210,60 200,80 T190,90" />
+        </svg>
+    </div>
+
+    <audio id="happyBD" src="happyBD.mp3" preload="auto"></audio>
+    <audio id="narration" src="narration.mp3" preload="auto"></audio>
+    <audio id="bgm" src="cute.mp3" preload="auto" loop></audio>
+</div>
+
+<script>
+    // ========== 元素快取 ==========
+    const elements = {
+        startScreen: document.getElementById('start-screen'),
+        wishBtn: document.getElementById('wish-btn'),
+        timeline1: document.getElementById('timeline1'),
+        timeline2: document.getElementById('timeline2'),
+        cardScreen: document.getElementById('card-screen'),
+        messageEl: document.getElementById('message'),
+        signature: document.getElementById('signature'),
+        signaturePath: document.querySelector('#signature path'),
+        narration: document.getElementById('narration'),
+        bgm: document.getElementById('bgm'),
+        happyBD: document.getElementById('happyBD'),
+        blowHint: document.getElementById('blow-hint'),
+        loadingProgress: document.getElementById('loading-progress'),
+        progressPercent: document.getElementById('progress-percent'),
+        progressFill: document.getElementById('progress-fill')
+    };
+    
+    let audioContext, analyser, microphone, micStream;
+    let isBlowing = false;
+    let animationId = null;
+    let preloadComplete = false;
+
+    const greetingText = `親愛的,生日快樂！
+
+感謝地心引力,
+讓妳在 12/12 走進我的生命。
+
+溫柔的妳,
+總是讓我心疼、讓我瘋狂,
+我會盡我全力,保護這樣的妳。
+
+每天每天,都在一直想著妳...
+
+1/7 見面,
+我會把欠妳的寵愛,「親自」送達。
+
+乖乖等我喔！`;
+
+    // ========== 預載系統 ==========
+    class MediaPreloader {
+        constructor() {
+            this.resources = [
+                { id: 'timeline1', element: elements.timeline1, type: 'video' },
+                { id: 'timeline2', element: elements.timeline2, type: 'video' },
+                { id: 'happyBD', element: elements.happyBD, type: 'audio' },
+                { id: 'narration', element: elements.narration, type: 'audio' },
+                { id: 'bgm', element: elements.bgm, type: 'audio' }
+            ];
+            this.loaded = {};
+            this.loadProgress = {};
+        }
+
+        async preloadAll(onProgress) {
+            const promises = this.resources.map(resource => 
+                this.preloadResource(resource, onProgress)
+            );
+            
+            try {
+                await Promise.all(promises);
+                return true;
+            } catch (error) {
+                console.error('預載過程發生錯誤:', error);
+                return false;
+            }
+        }
+
+        preloadResource(resource, onProgress) {
+            return new Promise((resolve) => {
+                const element = resource.element;
+                
+                if (!element) {
+                    console.warn(`找不到元素: ${resource.id}`);
+                    this.loaded[resource.id] = true;
+                    resolve();
+                    return;
+                }
+
+                // 確保開始載入
+                if (resource.type === 'video') {
+                    element.preload = 'auto';
+                }
+                element.load();
+
+                // 監聽載入進度
+                const updateProgress = () => {
+                    try {
+                        if (element.buffered.length > 0) {
+                            const bufferedEnd = element.buffered.end(element.buffered.length - 1);
+                            const duration = element.duration;
+                            if (duration > 0 && !isNaN(duration)) {
+                                this.loadProgress[resource.id] = (bufferedEnd / duration) * 100;
+                                onProgress(this.getOverallProgress());
+                            }
+                        }
+                    } catch (e) {
+                        // 忽略緩衝區讀取錯誤
+                    }
+                };
+
+                element.addEventListener('progress', updateProgress);
+                
+                // 可以播放時視為載入完成
+                const canPlayHandler = () => {
+                    this.loaded[resource.id] = true;
+                    this.loadProgress[resource.id] = 100;
+                    onProgress(this.getOverallProgress());
+                    console.log(`${resource.id} 載入完成`);
+                    resolve();
+                };
+
+                element.addEventListener('canplaythrough', canPlayHandler, { once: true });
+
+                // 錯誤處理
+                element.addEventListener('error', (e) => {
+                    console.error(`${resource.id} 載入失敗:`, element.error);
+                    showError(`${resource.id} 載入失敗，請檢查檔案是否存在`);
+                    // 即使失敗也繼續
+                    this.loaded[resource.id] = true;
+                    resolve();
+                }, { once: true });
+
+                // 超時保護 (20秒)
+                setTimeout(() => {
+                    if (!this.loaded[resource.id]) {
+                        console.warn(`${resource.id} 載入超時，繼續執行`);
+                        this.loaded[resource.id] = true;
+                        this.loadProgress[resource.id] = 100;
+                        onProgress(this.getOverallProgress());
+                        resolve();
+                    }
+                }, 20000);
+            });
+        }
+
+        getOverallProgress() {
+            const ids = this.resources.map(r => r.id);
+            let totalProgress = 0;
+            
+            ids.forEach(id => {
+                totalProgress += (this.loadProgress[id] || 0);
+            });
+            
+            return Math.round(totalProgress / ids.length);
+        }
+    }
+
+    // ========== 錯誤處理 ==========
+    function showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        document.body.appendChild(errorDiv);
+        
+        setTimeout(() => {
+            errorDiv.style.opacity = '0';
+            setTimeout(() => errorDiv.remove(), 500);
+        }, 5000);
+    }
+
+    // ========== 初始化預載 ==========
+    const preloader = new MediaPreloader();
+
+    // 頁面載入後立即開始預載
+    window.addEventListener('load', () => {
+        preloader.preloadAll((progress) => {
+            elements.progressPercent.textContent = progress;
+            elements.progressFill.style.width = progress + '%';
+            
+            if (progress >= 100) {
+                preloadComplete = true;
+                setTimeout(() => {
+                    elements.loadingProgress.style.opacity = '0';
+                    elements.wishBtn.disabled = false;
+                    elements.wishBtn.style.opacity = '1';
+                }, 500);
+            }
+        }).then((success) => {
+            if (success) {
+                console.log('所有媒體預載完成');
+            }
+        });
+    });
+
+    // ========== 開始體驗 ==========
+    elements.wishBtn.addEventListener('click', startExperience, { once: true });
+
+    function startExperience() {
+        if (!preloadComplete) {
+            showError('檔案尚未載入完成，請稍候...');
+            return;
+        }
+
+        elements.wishBtn.style.animation = 'none';
+        
+        // 隱藏開始畫面
+        elements.startScreen.style.opacity = '0';
+        setTimeout(() => { 
+            elements.startScreen.style.display = 'none'; 
+        }, 1000);
+        
+        // 播放生日快樂歌
+        if (elements.happyBD) {
+            elements.happyBD.volume = 1.0;
+            elements.happyBD.play().catch(e => {
+                console.warn("音樂播放失敗", e);
+                showError('音樂播放失敗，請點擊畫面重試');
+            });
+        }
+
+        // 播放並淡入第一段影片
+        elements.timeline1.muted = true;
+        elements.timeline1.play().then(() => {
+            console.log("Timeline1 開始播放");
+            elements.timeline1.offsetHeight; // 強制重繪
+            elements.timeline1.classList.add('visible');
+        }).catch(err => {
+            console.error("Timeline1 播放失敗:", err);
+            elements.timeline1.style.opacity = '1';
+        });
+
+        // 預先初始化 AudioContext
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(e) { 
+            console.log("AudioContext 初始化警告"); 
+        }
+
+        // 解鎖其他音頻
+        unlockAudio();
+
+        // 備用手動觸發
+        setTimeout(() => {
+            document.addEventListener('click', manualBlow, { once: true });
+            document.addEventListener('touchstart', manualBlow, { once: true });
+        }, 3000);
+    }
+
+    // ========== 音樂結束後啟動麥克風 ==========
+    elements.happyBD.addEventListener('ended', () => {
+        if (!isBlowing) {
+            console.log("生日快樂歌結束，請求麥克風權限...");
+            elements.blowHint.innerHTML = "現在，請對著麥克風吹氣<br>把蠟燭吹熄吧！";
+            elements.blowHint.style.opacity = '1';
+            initMicrophone();
+        }
+    });
+
+    function unlockAudio() {
+        [elements.timeline2, elements.narration, elements.bgm].forEach(media => {
+            if (media) {
+                media.play().then(() => {
+                    media.pause();
+                    media.currentTime = 0;
+                }).catch(() => {});
+            }
+        });
+    }
+
+    // ========== 麥克風偵測 ==========
+    async function initMicrophone() {
+        try {
+            micStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { 
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false 
+                }
+            });
+            
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
+            analyser = audioContext.createAnalyser();
+            microphone = audioContext.createMediaStreamSource(micStream);
+            microphone.connect(analyser);
+            analyser.fftSize = 512;
+            analyser.smoothingTimeConstant = 0.3;
+            
+            console.log("麥克風啟動成功");
+            detectBlow();
+            
+        } catch (err) {
+            console.warn('麥克風啟動失敗:', err);
+            elements.blowHint.innerHTML = "麥克風權限未開啟<br>請直接「點擊畫面」吹熄蠟燭";
+        }
+    }
+
+    function detectBlow() {
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        let blowCount = 0;
+        
+        function checkAudio() {
+            if (isBlowing) {
+                cancelAnimationFrame(animationId);
+                return;
+            }
+            
+            analyser.getByteFrequencyData(dataArray);
+            let lowFreqSum = 0;
+            
+            // 偵測低頻段
+            for (let i = 0; i < bufferLength * 0.2; i++) {
+                lowFreqSum += dataArray[i];
+            }
+            let average = lowFreqSum / (bufferLength * 0.2);
+
+            if (average > 50) {
+                blowCount++;
+                if (blowCount > 3) {
+                    triggerBlowOut();
+                    return;
+                }
+            } else {
+                blowCount = Math.max(0, blowCount - 1);
+            }
+            
+            animationId = requestAnimationFrame(checkAudio);
+        }
+        
+        animationId = requestAnimationFrame(checkAudio);
+    }
+
+    function manualBlow() {
+        if (!isBlowing) triggerBlowOut();
+    }
+
+    // ========== 吹熄蠟燭 ==========
+    function triggerBlowOut() {
+        if (isBlowing) return;
+        isBlowing = true;
+        
+        console.log("蠟燭被吹熄！");
+        
+        elements.happyBD.pause();
+        cleanupMicrophone();
+        elements.blowHint.style.opacity = '0';
+
+        // 播放吹熄影片
+        elements.timeline2.style.zIndex = '100';
+        elements.timeline2.classList.add('visible');
+        
+        elements.timeline2.play().then(() => {
+            setTimeout(() => {
+                elements.timeline1.classList.remove('visible');
+                elements.timeline1.pause();
+            }, 200);
+        }).catch(err => {
+            console.error("Timeline2 播放錯誤", err);
+            // 失敗則直接顯示賀卡
+            showCard();
+        });
+
+        elements.timeline2.addEventListener('ended', () => {
+            setTimeout(showCard, 500);
+        }, { once: true });
+    }
+
+    function cleanupMicrophone() {
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
+        if (micStream) {
+            micStream.getTracks().forEach(track => track.stop());
+            micStream = null;
+        }
+        if (microphone) {
+            microphone.disconnect();
+            microphone = null;
+        }
+    }
+
+    // ========== 顯示賀卡 ==========
+    function showCard() {
+        console.log("顯示賀卡");
+        
+        // 隱藏影片層
+        elements.timeline2.style.zIndex = '1'; 
+        elements.timeline2.style.opacity = '0';
+        
+        // 顯示賀卡層
+        elements.cardScreen.style.zIndex = '200'; 
+        elements.cardScreen.style.opacity = '1';
+        elements.cardScreen.style.pointerEvents = 'auto';
+
+        // 播放背景音樂
+        if (elements.bgm) {
+            elements.bgm.volume = 0.25;
+            elements.bgm.play().catch(() => {});
+        }
+
+        // 播放旁白
+        if (elements.narration) {
+            elements.narration.volume = 1.0;
+            elements.narration.play().catch(() => {});
+            elements.narration.addEventListener('ended', () => {
+                if (elements.bgm) {
+                    fadeBgmVolume(0.25, 0.8, 3000);
+                }
+            }, { once: true });
+        }
+
+        // 開始打字效果
+        setTimeout(() => {
+            typeWriter(greetingText, 0);
+        }, 800);
+        
+        // 徹底隱藏影片
+        setTimeout(() => {
+            elements.timeline2.style.display = 'none';
+            elements.timeline1.style.display = 'none';
+        }, 2000);
+    }
+
+    function typeWriter(text, index) {
+        if (index >= text.length) {
+            showSignature();
+            return;
+        }
+        
+        const char = text.charAt(index);
+        if (char === '\n') {
+            elements.messageEl.appendChild(document.createElement('br'));
+        } else {
+            elements.messageEl.appendChild(document.createTextNode(char));
+        }
+
+        let delay = 80;
+        if (char === ',' || char === '。' || char === '！' || char === '？') {
+            delay = 400;
+        } else if (char === '\n') {
+            delay = 600;
+        }
+
+        setTimeout(() => typeWriter(text, index + 1), delay);
+    }
+
+    function showSignature() {
+        setTimeout(() => {
+            elements.signature.style.opacity = '1';
+            elements.signaturePath.classList.add('animate');
+        }, 1000);
+    }
+
+    function fadeBgmVolume(from, to, duration) {
+        if (!elements.bgm) return;
+        
+        const steps = 50;
+        const stepDuration = duration / steps;
+        const increment = (to - from) / steps;
+        let current = from;
+        let step = 0;
+        
+        const fadeInterval = setInterval(() => {
+            if (step >= steps) {
+                clearInterval(fadeInterval);
+                elements.bgm.volume = to;
+                return;
+            }
+            current += increment;
+            elements.bgm.volume = Math.max(0, Math.min(1, current));
+            step++;
+        }, stepDuration);
+    }
+
+    // ========== 清理資源 ==========
+    window.addEventListener('beforeunload', cleanupMicrophone);
+
+    // ========== Service Worker 註冊 (可選) ==========
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker 註冊成功'))
+            .catch(err => console.log('Service Worker 未註冊:', err));
+    }
+</script>
+
+</body>
+</html>
