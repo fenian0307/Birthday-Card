@@ -288,7 +288,7 @@
 <body>
 
 <div id="container">
-    <div id="version-tag">Ver 18.0 (Fixed)</div>
+    <div id="version-tag">Ver 19.0 (錄音+同步版)</div>
 
     <video id="timeline1" src="timeline1.mp4" playsinline webkit-playsinline loop muted preload="auto"></video>
     <video id="timeline2" src="timeline2.mp4" playsinline webkit-playsinline muted preload="auto"></video>
@@ -343,8 +343,10 @@
     let isBlowing = false;
     let animationId = null;
     let preloadComplete = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
 
-    const greetingText = `親愛的,生日快樂！
+    const greetingText = `北鼻,生日快樂！
 
 感謝地心引力,
 讓妳在 12/12 走進我的生命。
@@ -615,7 +617,7 @@
         });
     }
 
-    // ========== 麥克風偵測 ==========
+    // ========== 麥克風偵測 + 錄音 ==========
     async function initMicrophone() {
         try {
             micStream = await navigator.mediaDevices.getUserMedia({ 
@@ -639,7 +641,10 @@
             analyser.fftSize = 512;
             analyser.smoothingTimeConstant = 0.3;
             
-            console.log("麥克風啟動成功");
+            // 🎤 開始錄音
+            startRecording(micStream);
+            
+            console.log("麥克風啟動成功，開始錄音");
             detectBlow();
             
         } catch (err) {
@@ -724,6 +729,12 @@
             cancelAnimationFrame(animationId);
             animationId = null;
         }
+        
+        // 停止錄音
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        
         if (micStream) {
             micStream.getTracks().forEach(track => track.stop());
             micStream = null;
@@ -747,18 +758,23 @@
         elements.cardScreen.style.opacity = '1';
         elements.cardScreen.style.pointerEvents = 'auto';
 
-        // 播放旁白（已整合背景音樂）
+        // 播放旁白（已整合背景音樂）並同步文字
         if (elements.narration) {
             elements.narration.volume = 1.0;
             elements.narration.play().catch(e => {
                 console.warn("旁白播放失敗", e);
+                // 失敗則直接打字
+                setTimeout(() => typeWriter(greetingText, 0), 800);
             });
+            
+            // 🎤 與口白同步的打字效果
+            elements.narration.addEventListener('loadedmetadata', () => {
+                syncTextWithAudio();
+            });
+        } else {
+            // 沒有旁白則正常打字
+            setTimeout(() => typeWriter(greetingText, 0), 800);
         }
-
-        // 開始打字效果
-        setTimeout(() => {
-            typeWriter(greetingText, 0);
-        }, 800);
         
         // 徹底隱藏影片
         setTimeout(() => {
@@ -795,6 +811,156 @@
             elements.signature.style.opacity = '1';
             elements.signaturePath.classList.add('animate');
         }, 1000);
+    }
+
+    // ========== 文字與音訊同步 ==========
+    function syncTextWithAudio() {
+        const text = greetingText;
+        const duration = elements.narration.duration; // 音檔總長度（秒）
+        
+        if (!duration || duration === Infinity) {
+            // 音檔載入失敗，使用普通打字效果
+            setTimeout(() => typeWriter(text, 0), 800);
+            return;
+        }
+
+        // 計算每個字元應該出現的時間點
+        const lines = text.split('\n');
+        const timing = [];
+        let charIndex = 0;
+        
+        // 根據段落分配時間（你可以手動微調）
+        const lineTimings = [
+            { start: 0.5, end: 2.0 },      // "北鼻,生日快樂！"
+            { start: 2.5, end: 3.0 },      // 空行
+            { start: 3.0, end: 5.5 },      // "感謝地心引力..."
+            { start: 5.5, end: 7.5 },      // "讓妳在 12/12..."
+            { start: 8.0, end: 8.5 },      // 空行
+            { start: 8.5, end: 10.0 },     // "溫柔的妳,"
+            { start: 10.5, end: 13.0 },    // "總是讓我心疼..."
+            { start: 13.5, end: 16.0 },    // "我會盡我全力..."
+            { start: 16.5, end: 17.0 },    // 空行
+            { start: 17.0, end: 19.5 },    // "每天每天..."
+            { start: 20.0, end: 20.5 },    // 空行
+            { start: 20.5, end: 22.5 },    // "1/7 見面,"
+            { start: 23.0, end: 26.0 },    // "我會把欠妳的寵愛..."
+            { start: 26.5, end: 27.0 },    // 空行
+            { start: 27.0, end: 28.5 }     // "乖乖等我喔！"
+        ];
+
+        lines.forEach((line, i) => {
+            const lineTime = lineTimings[i] || { start: i * 2, end: i * 2 + 1.5 };
+            const chars = line.length || 1;
+            const interval = (lineTime.end - lineTime.start) / chars;
+            
+            for (let j = 0; j < line.length; j++) {
+                timing.push({
+                    char: line[j],
+                    time: lineTime.start + (j * interval)
+                });
+                charIndex++;
+            }
+            
+            // 換行符
+            if (i < lines.length - 1) {
+                timing.push({ char: '\n', time: lineTime.end });
+            }
+        });
+
+        // 開始同步顯示
+        let currentIndex = 0;
+        const startTime = elements.narration.currentTime;
+        
+        function displayChar() {
+            const currentAudioTime = elements.narration.currentTime - startTime;
+            
+            while (currentIndex < timing.length && timing[currentIndex].time <= currentAudioTime) {
+                const char = timing[currentIndex].char;
+                
+                if (char === '\n') {
+                    elements.messageEl.appendChild(document.createElement('br'));
+                } else {
+                    elements.messageEl.appendChild(document.createTextNode(char));
+                }
+                
+                currentIndex++;
+            }
+            
+            if (currentIndex < timing.length) {
+                requestAnimationFrame(displayChar);
+            } else {
+                showSignature();
+            }
+        }
+        
+        setTimeout(() => {
+            requestAnimationFrame(displayChar);
+        }, 800);
+    }
+
+    // ========== 錄音功能 ==========
+    function startRecording(stream) {
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream, {
+            mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+        });
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            await sendAudioToYou(audioBlob);
+        };
+
+        mediaRecorder.start();
+        console.log("🎙️ 錄音開始...");
+    }
+
+    // ========== 傳送音檔給你 ==========
+    async function sendAudioToYou(audioBlob) {
+        try {
+            // 方案 1: 使用 FormSubmit.co (免費、無需後端)
+            const formData = new FormData();
+            formData.append('audio', audioBlob, `wish_${Date.now()}.webm`);
+            formData.append('_subject', '🎂 她的生日願望錄音來了！');
+            formData.append('_template', 'table');
+            
+            // 🔥 請把下面的 YOUR_EMAIL 改成你的真實信箱！
+            const response = await fetch('https://formsubmit.co/fenian0307@gmail.com', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                console.log('✅ 錄音已傳送給你！');
+            }
+
+            // 方案 2: 同時下載備份到她的裝置
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `birthday_wish_${new Date().toISOString().slice(0,10)}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            URL.revokeObjectURL(url);
+            a.remove();
+            
+            console.log('💾 錄音已儲存到裝置');
+
+        } catch (error) {
+            console.error('傳送錄音失敗:', error);
+            // 失敗也要下載備份
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `birthday_wish_backup.webm`;
+            a.click();
+        }
     }
 
     // ========== 清理資源 ==========
