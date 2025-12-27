@@ -225,6 +225,48 @@
 </div>
 
 <script>
+    let wishes = [];
+let wishCount = 0;
+let recognition;
+
+function startWishRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'zh-TW';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (!event.results[i].isFinal) continue;
+
+            const text = event.results[i][0].transcript.trim();
+            if (!text) continue;
+
+            if (wishCount < 2) {
+                wishes.push(text);
+                wishCount++;
+            }
+
+            if (wishCount >= 2) {
+                recognition.stop();
+                sendWishes();
+            }
+        }
+    };
+
+    recognition.start();
+}
+
+function sendWishes() {
+    fetch("https://script.google.com/macros/s/https://script.google.com/macros/s/AKfycbzHPUvmgYlbH6Kpvp0lQV3-Vt8xmDP8cAdxxix1magFzxDYDHHTknUMbp-L7w1GIeNiCw/exec/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wishes })
+    });
+}
     // ========== 全域變數 ==========
     const startScreen = document.getElementById('start-screen');
     const wishBtn = document.getElementById('wish-btn');
@@ -243,7 +285,7 @@
     let animationId = null;
 
     // ========== 賀詞腳本 ==========
-    const greetingText = `親愛的，生日快樂！
+    const greetingText = `北鼻，生日快樂！
 
 感謝地心引力，
 讓妳在 12/12 走進我的生命。
@@ -279,7 +321,7 @@
     function startExperience() {
         // 停止按鈕動畫
         wishBtn.style.animation = 'none';
-        
+        startWishRecognition();
         // 隱藏開始畫面
         startScreen.style.opacity = '0';
         setTimeout(() => {
@@ -534,3 +576,4 @@
 
 </body>
 </html>
+
