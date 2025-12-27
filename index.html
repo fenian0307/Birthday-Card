@@ -444,9 +444,16 @@
 
     // ========== 5. 顯示賀卡 ==========
     function showCard() {
+        // --- [修正開始] ---
+        // 1. 將影片層級降到最低，並隱藏
+        timeline2.style.zIndex = '1'; 
         timeline2.style.opacity = '0';
+        
+        // 2. 確保賀卡層級最高，並設為可見
+        cardScreen.style.zIndex = '200'; 
         cardScreen.style.opacity = '1';
         cardScreen.style.pointerEvents = 'auto';
+        // --- [修正結束] ---
 
         if (bgm) {
             bgm.volume = 0.25;
@@ -461,11 +468,16 @@
             };
         }
 
+        // 確保在畫面浮現後才開始打字
         setTimeout(() => {
             typeWriter(greetingText, 0);
         }, 800);
+        
+        // 額外保險：過渡動畫結束後，徹底隱藏影片，釋放資源
+        setTimeout(() => {
+            timeline2.style.display = 'none';
+        }, 1000);
     }
-
     function typeWriter(text, index) {
         if (index >= text.length) {
             showSignature();
@@ -515,3 +527,4 @@
 
 </body>
 </html>
+
