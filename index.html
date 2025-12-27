@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -24,6 +25,7 @@
             position: relative;
             width: 100%;
             height: 100%;
+            background-color: #000;
         }
 
         /* 影片層 */
@@ -34,25 +36,27 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            opacity: 0;
-            /* 預設 transition，timeline2 用 */
-            transition: opacity 0.5s ease;
             pointer-events: none;
             will-change: opacity;
         }
 
-        #timeline1 { z-index: 10; }
-        #timeline2 { z-index: 5; }
-
-        /* Timeline1 專用的 5秒淡入效果 */
-        video#timeline1.fade-in {
-            opacity: 1;
-            transition: opacity 5s ease-in; /* 修改：5秒淡出 */
+        /* Timeline1: 初始透明，設定 5秒淡入過渡 */
+        #timeline1 { 
+            z-index: 10; 
+            opacity: 0; 
+            transition: opacity 5s ease-in; /* 關鍵：5秒淡入 */
         }
-        
-        video#timeline2.visible { opacity: 1; }
 
-        /* 開始畫面 - 修改為全黑背景 */
+        /* Timeline2: 初始透明，設定快速切換 */
+        #timeline2 { 
+            z-index: 20; 
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        video.visible { opacity: 1 !important; }
+
+        /* 開始畫面 */
         #start-screen {
             position: absolute;
             top: 0;
@@ -63,7 +67,7 @@
             justify-content: center;
             align-items: center;
             z-index: 999;
-            background-color: #000; /* 修改：全黑 */
+            background-color: #000;
             transition: opacity 1s ease;
         }
 
@@ -71,7 +75,7 @@
             background: rgba(255, 255, 255, 0.15);
             border: 2px solid rgba(255, 255, 255, 0.4);
             color: #fff;
-            padding: 25px 30px; /* 調整 padding 適應長文字 */
+            padding: 25px 30px;
             font-size: 1.2rem;
             border-radius: 30px;
             cursor: pointer;
@@ -82,18 +86,12 @@
             user-select: none;
             line-height: 1.6;
             text-align: center;
-            max-width: 90%; /* 防止文字超出 */
+            max-width: 90%;
         }
 
         @keyframes pulse {
-            0%, 100% { 
-                transform: scale(1); 
-                box-shadow: 0 8px 32px rgba(255, 215, 0, 0.3); 
-            }
-            50% { 
-                transform: scale(1.05); 
-                box-shadow: 0 12px 48px rgba(255, 215, 0, 0.6); 
-            }
+            0%, 100% { transform: scale(1); box-shadow: 0 8px 32px rgba(255, 215, 0, 0.3); }
+            50% { transform: scale(1.05); box-shadow: 0 12px 48px rgba(255, 215, 0, 0.6); }
         }
 
         #wish-btn span {
@@ -174,11 +172,8 @@
             animation: sign 3s ease-out forwards;
         }
         
-        @keyframes sign { 
-            to { stroke-dashoffset: 0; } 
-        }
+        @keyframes sign { to { stroke-dashoffset: 0; } }
 
-        /* 版本標籤 */
         #version-tag {
             position: absolute;
             bottom: 8px;
@@ -193,22 +188,10 @@
 <body>
 
 <div id="container">
-    <div id="version-tag">Ver 15.0 (Birthday Ed.)</div>
+    <div id="version-tag">Ver 16.0 (Fixed Timeline/Mic)</div>
 
-    <video id="timeline1" 
-           src="timeline1.mp4" 
-           playsinline 
-           webkit-playsinline 
-           loop 
-           muted 
-           preload="auto"></video>
-
-    <video id="timeline2" 
-           src="timeline2.mp4" 
-           playsinline 
-           webkit-playsinline 
-           muted 
-           preload="none"></video>
+    <video id="timeline1" src="timeline1.mp4" playsinline webkit-playsinline loop muted preload="auto"></video>
+    <video id="timeline2" src="timeline2.mp4" playsinline webkit-playsinline muted preload="none"></video>
 
     <div id="start-screen">
         <button id="wish-btn">
@@ -232,7 +215,6 @@
 </div>
 
 <script>
-    // ========== 全域變數 ==========
     const startScreen = document.getElementById('start-screen');
     const wishBtn = document.getElementById('wish-btn');
     const timeline1 = document.getElementById('timeline1');
@@ -243,14 +225,13 @@
     const signaturePath = signature.querySelector('path');
     const narration = document.getElementById('narration');
     const bgm = document.getElementById('bgm');
-    const happyBD = document.getElementById('happyBD'); // 新增
+    const happyBD = document.getElementById('happyBD');
     const blowHint = document.getElementById('blow-hint');
     
     let audioContext, analyser, microphone, micStream;
     let isBlowing = false;
     let animationId = null;
 
-    // ========== 賀詞腳本 ==========
     const greetingText = `親愛的，生日快樂！
 
 感謝地心引力，
@@ -267,68 +248,72 @@
 
 乖乖等我喔！`;
 
-    // ========== 錯誤處理 ==========
-    timeline1.addEventListener('error', (e) => console.error('Timeline1 載入失敗'));
-    timeline2.addEventListener('error', (e) => console.error('Timeline2 載入失敗'));
+    // 錯誤監聽
+    timeline1.addEventListener('error', (e) => console.error('Timeline1 Error:', timeline1.error));
+    timeline2.addEventListener('error', (e) => console.error('Timeline2 Error:', timeline2.error));
 
-    // ========== 1. 點擊按鈕 (啟動流程) ==========
+    // ========== 1. 啟動流程 ==========
     wishBtn.addEventListener('click', startExperience, { once: true });
 
     function startExperience() {
-        // 停止按鈕動畫
         wishBtn.style.animation = 'none';
         
-        // 隱藏開始畫面 (背景已是黑色，所以只是隱藏按鈕)
+        // 隱藏開始畫面 (背景保持黑)
         startScreen.style.opacity = '0';
-        setTimeout(() => {
-            startScreen.style.display = 'none';
-        }, 1000);
+        setTimeout(() => { startScreen.style.display = 'none'; }, 1000);
         
-        // 步驟 A: 播放生日快樂歌
+        // A. 播放音樂
         if (happyBD) {
             happyBD.volume = 1.0;
-            happyBD.play().catch(e => console.log("HappyBD play failed", e));
+            happyBD.play().catch(e => console.warn("Audio play failed", e));
         }
 
-        // 步驟 B: 播放 Timeline1 (設定為 5秒淡入)
-        timeline1.style.opacity = '0'; // 確保初始不可見
-        timeline1.play().catch(() => {
-            timeline1.muted = true;
-            timeline1.play();
+        // B. 處理影片淡入 (關鍵修正)
+        // 先確保影片開始播放，再執行 CSS opacity 轉場
+        timeline1.muted = true; // 確保靜音以允許自動播放
+        timeline1.play().then(() => {
+            console.log("Timeline1 playing, starting fade-in");
+            // 強制重繪以確保 transition 生效
+            timeline1.offsetHeight; 
+            timeline1.classList.add('visible'); // 觸發 5秒 fade-in
+        }).catch(err => {
+            console.error("Timeline1 play failed:", err);
+            // 失敗備案：直接顯示
+            timeline1.style.opacity = '1';
         });
-        
-        // 強制 Reflow 後加入 class 觸發 5s transition
-        setTimeout(() => {
-            timeline1.classList.add('fade-in');
-        }, 100);
 
-        // 預先載入 Timeline2
-        setTimeout(() => { timeline2.load(); }, 800);
+        // 預載第二段
+        setTimeout(() => timeline2.load(), 1000);
 
-        // 音訊解鎖 (iOS 需求)
+        // C. 預先初始化 AudioContext (但不請求麥克風權限)
+        // 這是為了在稍後不需要使用者點擊就能處理音頻
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(e) { console.log("AudioContext init warning"); }
+
+        // 解鎖其他音頻
         unlockAudio();
 
-        // 步驟 C: 啟動麥克風 (在使用者點擊時必須觸發)
-        // 雖然畫面是黑的/淡入中，但系統已開始聽
-        initMicrophone();
-
-        // 備用：點擊觸發
+        // 備用：如果音樂播完還沒吹，提供點擊觸發
         setTimeout(() => {
             document.addEventListener('click', manualBlow, { once: true });
             document.addEventListener('touchstart', manualBlow, { once: true });
-        }, 1500);
-
-        // 步驟 D: 監聽生日歌結束 (權限提示)
-        happyBD.onended = () => {
-            if (!isBlowing) {
-                // 如果歌播完了還沒吹熄，提示權限問題
-                blowHint.innerHTML = "如果吹不熄，請檢查<br>「麥克風權限」是否開啟<br><span style='font-size:0.8em'>或點擊畫面直接跳過</span>";
-                blowHint.style.opacity = '1';
-            }
-        };
+        }, 3000);
     }
 
-    // ========== 音訊解鎖 ==========
+    // ========== 2. 音樂結束後才啟動麥克風 ==========
+    happyBD.onended = () => {
+        if (!isBlowing) {
+            console.log("Birthday song ended. Requesting Mic...");
+            // 顯示提示文字
+            blowHint.innerHTML = "現在，請對著麥克風吹氣<br>把蠟燭吹熄吧！";
+            blowHint.style.opacity = '1';
+            
+            // 請求權限
+            initMicrophone();
+        }
+    };
+
     function unlockAudio() {
         [timeline2, narration, bgm].forEach(media => {
             if (media) {
@@ -340,9 +325,11 @@
         });
     }
 
-    // ========== 2. 麥克風偵測 ==========
+    // ========== 3. 麥克風偵測 ==========
     async function initMicrophone() {
         try {
+            // 在 iOS 上，如果距離上次點擊太久，這個可能會被擋
+            // 但因為我們有正在播放的 audio (happyBD剛結束)，通常會被視為活躍 session
             micStream = await navigator.mediaDevices.getUserMedia({ 
                 audio: { 
                     echoCancellation: false,
@@ -351,7 +338,13 @@
                 }
             });
             
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
             analyser = audioContext.createAnalyser();
             microphone = audioContext.createMediaStreamSource(micStream);
             microphone.connect(analyser);
@@ -361,8 +354,9 @@
             detectBlow();
             
         } catch (err) {
-            console.warn('麥克風啟用失敗或被拒絕:', err);
-            // 這裡不立即顯示錯誤，等到生日歌播完再提示，保持沉浸感
+            console.warn('麥克風啟動失敗 (可能因權限或無手勢):', err);
+            // 如果失敗，更改提示文字引導點擊
+            blowHint.innerHTML = "麥克風權限未開啟<br>請直接「點擊畫面」吹熄蠟燭";
         }
     }
 
@@ -378,14 +372,13 @@
             }
             
             analyser.getByteFrequencyData(dataArray);
-            
             let lowFreqSum = 0;
+            // 專注於低頻段
             for (let i = 0; i < bufferLength * 0.2; i++) {
                 lowFreqSum += dataArray[i];
             }
             let average = lowFreqSum / (bufferLength * 0.2);
 
-            // 閾值
             if (average > 50) {
                 blowCount++;
                 if (blowCount > 3) {
@@ -395,47 +388,39 @@
             } else {
                 blowCount = Math.max(0, blowCount - 1);
             }
-            
             animationId = requestAnimationFrame(checkAudio);
         }
-        
         animationId = requestAnimationFrame(checkAudio);
     }
 
     function manualBlow() {
+        // 如果音樂還沒播完就點擊，也可以觸發
         if (!isBlowing) triggerBlowOut();
     }
 
-    // ========== 3. 切換到吹熄影片 ==========
+    // ========== 4. 吹熄蠟燭邏輯 ==========
     function triggerBlowOut() {
         if (isBlowing) return;
         isBlowing = true;
         
-        // 停止生日快樂歌
-        if (happyBD) {
-            happyBD.pause();
-        }
+        // 確保音樂停止
+        happyBD.pause();
         
-        // 清理資源
         cleanupMicrophone();
-        
-        // 移除提示
         blowHint.style.opacity = '0';
 
-        // 切換影片
+        // 播放吹熄影片
         timeline2.style.zIndex = '100';
-        timeline2.classList.add('visible');
+        timeline2.classList.add('visible'); // 瞬間顯示
         
         timeline2.play().then(() => {
+            // Timeline2 開始播之後，把 Timeline1 藏起來
             setTimeout(() => {
-                timeline1.classList.remove('fade-in');
+                timeline1.classList.remove('visible');
                 timeline1.pause();
-            }, 300);
-        }).catch(err => {
-            console.error('Timeline2 播放失敗:', err);
-        });
+            }, 200);
+        }).catch(err => console.error("Timeline2 Play Error", err));
 
-        // 影片結束後顯示賀卡
         timeline2.onended = () => {
             setTimeout(showCard, 500);
         };
@@ -454,13 +439,10 @@
             microphone.disconnect();
             microphone = null;
         }
-        if (audioContext && audioContext.state !== 'closed') {
-            audioContext.close();
-            audioContext = null;
-        }
+        // 不關閉 audioContext，因為後面還有背景音樂要用
     }
 
-    // ========== 4. 顯示賀卡 ==========
+    // ========== 5. 顯示賀卡 ==========
     function showCard() {
         timeline2.style.opacity = '0';
         cardScreen.style.opacity = '1';
@@ -484,15 +466,12 @@
         }, 800);
     }
 
-    // ========== 打字機效果 ==========
     function typeWriter(text, index) {
         if (index >= text.length) {
             showSignature();
             return;
         }
-
         const char = text.charAt(index);
-        
         if (char === '\n') {
             messageEl.appendChild(document.createElement('br'));
         } else {
@@ -500,16 +479,12 @@
         }
 
         let delay = 80;
-        if (char === '，' || char === '。' || char === '！' || char === '？') {
-            delay = 400;
-        } else if (char === '\n') {
-            delay = 600;
-        }
+        if (char === '，' || char === '。' || char === '！' || char === '？') delay = 400;
+        else if (char === '\n') delay = 600;
 
         setTimeout(() => typeWriter(text, index + 1), delay);
     }
 
-    // ========== 顯示簽名 ==========
     function showSignature() {
         setTimeout(() => {
             signature.style.opacity = '1';
@@ -517,14 +492,12 @@
         }, 1000);
     }
 
-    // ========== 音量淡入淡出 ==========
     function fadeBgmVolume(from, to, duration) {
         const steps = 50;
         const stepDuration = duration / steps;
         const increment = (to - from) / steps;
         let current = from;
         let step = 0;
-
         const fadeInterval = setInterval(() => {
             if (step >= steps) {
                 clearInterval(fadeInterval);
