@@ -26,7 +26,7 @@
             height: 100%;
         }
 
-        /* 影片層優化 */
+        /* 影片層 */
         video {
             position: absolute;
             top: 0;
@@ -37,7 +37,7 @@
             opacity: 0;
             transition: opacity 0.5s ease;
             pointer-events: none;
-            will-change: opacity; /* GPU 加速 */
+            will-change: opacity;
         }
 
         #timeline1 { z-index: 10; }
@@ -73,6 +73,7 @@
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             line-height: 1.6;
+            text-align: center;
         }
 
         @keyframes pulse {
@@ -176,27 +177,28 @@
             z-index: 100;
             pointer-events: none;
         }
-
-        /* 載入提示 */
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: rgba(255,255,255,0.6);
-            font-size: 0.9rem;
-            z-index: 998;
-        }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <div id="version-tag">Ver 13.0 Optimized</div>
+    <div id="version-tag">Ver 14.0 Fixed</div>
 
-    <!-- 影片層 -->
-    <video id="timeline1" playsinline webkit-playsinline loop muted preload="auto"></video>
-    <video id="timeline2" playsinline webkit-playsinline muted preload="none"></video>
+    <!-- 影片層（直接設定 src） -->
+    <video id="timeline1" 
+           src="timeline1.mp4" 
+           playsinline 
+           webkit-playsinline 
+           loop 
+           muted 
+           preload="auto"></video>
+
+    <video id="timeline2" 
+           src="timeline2.mp4" 
+           playsinline 
+           webkit-playsinline 
+           muted 
+           preload="none"></video>
 
     <!-- 開始畫面 -->
     <div id="start-screen">
@@ -218,8 +220,8 @@
     </div>
 
     <!-- 音訊 -->
-    <audio id="narration" preload="auto"></audio>
-    <audio id="bgm" preload="auto" loop></audio>
+    <audio id="narration" src="narration.mp3" preload="auto"></audio>
+    <audio id="bgm" src="cute.mp3" preload="auto" loop></audio>
 </div>
 
 <script>
@@ -257,17 +259,18 @@
 
 乖乖等我喔！`;
 
-    // ========== 初始化 ==========
-    window.addEventListener('load', () => {
-        // 設定影片來源
-        timeline1.src = 'Timeline1.mp4?v=' + Date.now();
-        timeline2.src = 'Timeline2.mp4?v=' + Date.now();
-        narration.src = 'narration.mp3?v=' + Date.now();
-        bgm.src = 'cute.mp3?v=' + Date.now();
-        
-        // 錯誤處理
-        timeline1.onerror = () => console.warn('Timeline1 載入失敗');
-        timeline2.onerror = () => console.warn('Timeline2 載入失敗');
+    // ========== 錯誤處理 ==========
+    timeline1.addEventListener('error', (e) => {
+        console.error('Timeline1 載入失敗:', timeline1.error);
+    });
+    
+    timeline2.addEventListener('error', (e) => {
+        console.error('Timeline2 載入失敗:', timeline2.error);
+    });
+
+    // ========== 載入完成監聽 ==========
+    timeline1.addEventListener('loadeddata', () => {
+        console.log('✅ Timeline1 載入成功');
     });
 
     // ========== 1. 點擊按鈕 ==========
@@ -471,7 +474,7 @@
         }, 800);
     }
 
-    // ========== 打字機效果（優化版） ==========
+    // ========== 打字機效果 ==========
     function typeWriter(text, index) {
         if (index >= text.length) {
             showSignature();
